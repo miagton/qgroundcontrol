@@ -70,6 +70,42 @@ SettingsPage {
 
     SettingsGroupLayout {
         Layout.fillWidth:   true
+        heading:            qsTr("Additional Video Streams")
+        visible:            !_videoSourceDisabled && !_videoAutoStreamConfig
+
+        FactCheckBox {
+            Layout.fillWidth:   true
+            text:               qsTr("Enable Extra Stream 2")
+            fact:               _videoSettings.streamEnabled2
+            visible:            fact.visible
+        }
+
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("RTSP URL 2")
+            fact:                       _videoSettings.rtspUrl2
+            visible:                    _videoSettings.streamEnabled2.value && fact.visible
+        }
+
+        FactCheckBox {
+            Layout.fillWidth:   true
+            text:               qsTr("Enable Extra Stream 3")
+            fact:               _videoSettings.streamEnabled3
+            visible:            fact.visible
+        }
+
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("RTSP URL 3")
+            fact:                       _videoSettings.rtspUrl3
+            visible:                    _videoSettings.streamEnabled3.value && fact.visible
+        }
+    }
+
+    SettingsGroupLayout {
+        Layout.fillWidth:   true
         heading:            qsTr("Settings")
         visible:            !_videoSourceDisabled
 

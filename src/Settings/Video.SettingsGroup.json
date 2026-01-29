@@ -135,6 +135,30 @@
     "enumValues":       "0,1,8,2,3,4,5,6,7",
     "default":           0,
     "qgcRebootRequired": true
-}
+},
+    {
+        "name": "rtspUrl2",
+        "shortDesc": "RTSP URL for Stream 2",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "streamEnabled2",
+        "shortDesc": "Enable Stream 2",
+        "type": "bool",
+        "default": false
+    },
+    {
+        "name": "rtspUrl3",
+        "shortDesc": "RTSP URL for Stream 3",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "streamEnabled3",
+        "shortDesc": "Enable Stream 3",
+        "type": "bool",
+        "default": false
+    }
 ]
 }
