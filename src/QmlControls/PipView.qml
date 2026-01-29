@@ -8,7 +8,8 @@ Item {
     id:         _root
     width:      _pipSize
     height:     _pipSize * (9/16)
-    visible:    item2 && item2.pipState !== item2.pipState.window && show
+    // Guard against partially constructed items
+    visible:    item2 && item2.pipState && item2.pipState.state !== item2.pipState.window && show
 
     property var    item1:                  null    // Required
     property var    item2:                  null    // Optional, may come and go
@@ -41,14 +42,26 @@ Item {
     }
 
     function _initForItems() {
-        var item1IsFull = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, true)
-        if (item1 && item2) {
+        // Be defensive: wait until pipState objects exist
+        if (!item1 || !item1.pipState) {
+            return
+        }
+        if (item2 && !item2.pipState) {
+            return
+        }
+
+        // Default to pip (false) so secondary windows start collapsed
+        var item1IsFull = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, false)
+        if (item1 && item2 && item1 !== item2) {
+            // Both items present: initialize according to saved setting
             item1.pipState.state = item1IsFull ? item1.pipState.fullState : item1.pipState.pipState
             item2.pipState.state = item1IsFull ? item2.pipState.pipState : item2.pipState.fullState
             _fullItem = item1IsFull ? item1 : item2
             _pipOrWindowItem = item1IsFull ? item2 : item1
         } else {
-            item1.pipState.state = item1.pipState.fullState
+            // Only item1 present (or item1 === item2)
+            // Start in pip mode by default
+            item1.pipState.state = item1.pipState.pipState
             _fullItem = item1
             _pipOrWindowItem = null
         }
@@ -56,6 +69,20 @@ Item {
     }
 
     function _swapPip() {
+        // Handle single-item view (toggle between pip and full)
+        if (item1 && item1 === item2 && item1.pipState) {
+            if (item1.pipState.state === item1.pipState.fullState) {
+                item1.pipState.state = item1.pipState.pipState
+            } else {
+                item1.pipState.state = item1.pipState.fullState
+            }
+            return
+        }
+
+        // Swap only if both items and their pipState objects exist
+        if (!item1 || !item2 || !item1.pipState || !item2.pipState) {
+            return
+        }
         var item1IsFull = false
         if (item1.pipState.state === item1.pipState.fullState) {
             item1.pipState.state = item1.pipState.pipState
@@ -147,7 +174,7 @@ Item {
         anchors.top:    parent.top
         visible:        _isExpanded && (ScreenTools.isMobile || pipMouseArea.containsMouse)
         height:         ScreenTools.defaultFontPixelHeight * 2.5
-        width:          ScreenTools.defaultFontPixelHeight * 2.5
+        width:          ScreenTools.defaultFontPixelPixelHeight * 2.5
         sourceSize.height:  height
     }
 
@@ -184,7 +211,11 @@ Item {
 
         MouseArea {
             anchors.fill:   parent
-            onClicked:      _pipOrWindowItem.pipState.state = _pipOrWindowItem.pipState.windowState
+            onClicked: {
+                if (_pipOrWindowItem && _pipOrWindowItem.pipState) {
+                    _pipOrWindowItem.pipState.state = _pipOrWindowItem.pipState.windowState
+                }
+            }
         }
     }
 
@@ -213,7 +244,7 @@ Item {
         width:                  ScreenTools.defaultFontPixelHeight * 2
         radius:                 ScreenTools.defaultFontPixelHeight / 3
         visible:                !_isExpanded
-        color:                  _fullItem.pipState.isDark ? Qt.rgba(0,0,0,0.75) : Qt.rgba(0,0,0,0.5)
+        color:                  (_fullItem && _fullItem.pipState && _fullItem.pipState.isDark) ? Qt.rgba(0,0,0,0.75) : Qt.rgba(0,0,0,0.5)
         Image {
             width:              parent.width  * 0.75
             height:             parent.height * 0.75

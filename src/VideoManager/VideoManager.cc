@@ -26,6 +26,9 @@
 #include <QtQuick/QQuickWindow>
 #include <QtCore/QTimer>
 
+#include <functional>
+#include <memory>
+
 QGC_LOGGING_CATEGORY(VideoManagerLog, "Video.VideoManager")
 
 static constexpr const char *kFileExtension[VideoReceiver::FILE_FORMAT_MAX + 1] = {
@@ -114,12 +117,22 @@ void VideoManager::_initAfterQmlIsReady()
 
     qCDebug(VideoManagerLog) << "_initAfterQmlIsReady";
 
-    static const QStringList videoStreamList = {
+    // Initialize primary video streams
+    QStringList videoStreamList = {
         "videoContent",
-        "thermalVideo",
-        "videoContent2",
-        "videoContent3"
+        "thermalVideo"
     };
+
+    // Add additional streams if they are enabled and have a URL configured
+    if (_videoSettings->streamEnabled2()->rawValue().toBool() &&
+        !_videoSettings->rtspUrl2()->rawValue().toString().trimmed().isEmpty()) {
+        videoStreamList.append("videoContent2");
+    }
+    if (_videoSettings->streamEnabled3()->rawValue().toBool() &&
+        !_videoSettings->rtspUrl3()->rawValue().toString().trimmed().isEmpty()) {
+        videoStreamList.append("videoContent3");
+    }
+
     for (const QString &streamName : videoStreamList) {
         VideoReceiver *receiver = QGCCorePlugin::instance()->createVideoReceiver(this);
         if (!receiver) {
@@ -701,11 +714,16 @@ void VideoManager::_startReceiver(VideoReceiver *receiver)
         return;
     }
 
-    const QString source = _videoSettings->videoSource()->rawValue().toString();
+    // Choose timeout based on the receiver URI, not the global primary videoSource.
+    // This matters because stream2/3 are always RTSP even if the primary stream is not.
+    const QString uri = receiver->uri();
+    const bool isRtsp = uri.startsWith(QStringLiteral("rtsp://"), Qt::CaseInsensitive) ||
+                        uri.startsWith(QStringLiteral("rtspt://"), Qt::CaseInsensitive) ||
+                        uri.startsWith(QStringLiteral("rtsps://"), Qt::CaseInsensitive);
+
     /* The gstreamer rtsp source will switch to tcp if udp is not available after 5 seconds.
        So we should allow for some negotiation time for rtsp */
-
-    const uint32_t timeout = ((source == VideoSettings::videoSourceRTSP) ? _videoSettings->rtspTimeout()->rawValue().toUInt() : 3);
+    const uint32_t timeout = isRtsp ? _videoSettings->rtspTimeout()->rawValue().toUInt() : 3;
 
     receiver->start(timeout);
 }
@@ -722,11 +740,22 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
     }
     receiver->setWidget(widget);
 
-    void *sink = QGCCorePlugin::instance()->createVideoSink(receiver->widget(), receiver);
-    if (!sink) {
-        qCCritical(VideoManagerLog) << "createVideoSink() failed" << receiver->name();
+    // For additional streams, their widget may not exist yet at startup (Loader-created).
+    // Creating the sink with a null widget has led to stalls/hangs on some systems.
+    // We'll create the sink later in the retry loop once the widget is available.
+    const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") || receiver->name() == QStringLiteral("videoContent3"));
+    if (!isAdditionalStream) {
+        if (!receiver->widget()) {
+            qCWarning(VideoManagerLog) << "Primary stream widget missing, skipping start" << receiver->name();
+            return;
+        }
+        void *sink = QGCCorePlugin::instance()->createVideoSink(receiver->widget(), receiver);
+        if (!sink) {
+            qCCritical(VideoManagerLog) << "createVideoSink() failed" << receiver->name();
+            return;
+        }
+        receiver->setSink(sink);
     }
-    receiver->setSink(sink);
 
     (void) connect(receiver, &VideoReceiver::onStartComplete, this, [this, receiver](VideoReceiver::STATUS status) {
         if (!receiver) {
@@ -745,10 +774,16 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
         case VideoReceiver::STATUS_INVALID_STATE:
             break;
         default:
-            _restartVideo(receiver);
+            // Primary stream uses aggressive restart logic. For additional streams,
+            // avoid restart loops which can stall the UI on some systems if RTSP is misbehaving.
+            if (receiver->name() == QStringLiteral("videoContent2") || receiver->name() == QStringLiteral("videoContent3")) {
+                qCWarning(VideoManagerLog) << "Additional stream failed to start, not auto-restarting" << receiver->name() << receiver->uri();
+            } else {
+                _restartVideo(receiver);
+            }
             break;
-        }
-    });
+         }
+     });
 
     (void) connect(receiver, &VideoReceiver::onStopComplete, this, [this, receiver](VideoReceiver::STATUS status) {
         qCDebug(VideoManagerLog) << "Stop complete" << receiver->name() << receiver->uri()  << ", status:" << status;
@@ -825,7 +860,62 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
     _videoReceivers.append(receiver);
 
     if (hasVideo()) {
-        _startReceiver(receiver);
+        const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") || receiver->name() == QStringLiteral("videoContent3"));
+
+        // Additional streams are created from QML Loaders and their widgets may not exist yet at startup.
+        // Starting before a widget/sink exists can lead to backend stalls on some platforms.
+        if (isAdditionalStream) {
+            constexpr int kMaxWidgetRetries = 20;      // ~10s total
+            constexpr int kRetryIntervalMs  = 500;
+
+            auto tryStart = std::make_shared<std::function<void(int)>>();
+            *tryStart = [this, receiver, window, tryStart](int attempt) {
+                 if (!receiver) {
+                     return;
+                 }
+
+                 // If widget/sink isn't ready yet, try to bind them again.
+                 if (!receiver->widget()) {
+                     QQuickItem *w = window ? window->findChild<QQuickItem*>(receiver->name()) : nullptr;
+                     if (w) {
+                         receiver->setWidget(w);
+                     }
+                 }
+
+                 if (receiver->widget() && !receiver->sink()) {
+                     void *s = QGCCorePlugin::instance()->createVideoSink(receiver->widget(), receiver);
+                     if (s) {
+                         receiver->setSink(s);
+                     }
+                 }
+
+                 // Start only once we have both widget and sink
+                 if (receiver->widget() && receiver->sink()) {
+                     _startReceiver(receiver);
+                     return;
+                 }
+
+                 if (attempt >= kMaxWidgetRetries) {
+                     qCWarning(VideoManagerLog) << "Giving up waiting for video widget/sink for" << receiver->name();
+                     return;
+                 }
+
+                 QTimer::singleShot(kRetryIntervalMs, this, [attempt, tryStart]() {
+                    (*tryStart)(attempt + 1);
+                 });
+             };
+
+             // Delay first attempt to give QML time to instantiate the Loader content.
+             QTimer::singleShot(1500, this, [tryStart]() {
+                (*tryStart)(0);
+             });
+        } else {
+            if (receiver->widget() && receiver->sink()) {
+                _startReceiver(receiver);
+            } else {
+                qCWarning(VideoManagerLog) << "Primary stream missing widget/sink, not starting" << receiver->name();
+            }
+        }
     }
 }
 
@@ -859,3 +949,4 @@ void FinishVideoInitialization::run()
     qCDebug(VideoManagerLog) << "FinishVideoInitialization::run";
     QMetaObject::invokeMethod(VideoManager::instance(), &VideoManager::_initAfterQmlIsReady, Qt::QueuedConnection);
 }
+

@@ -46,9 +46,43 @@ Item {
     property real   _rightPanelWidth:       ScreenTools.defaultFontPixelWidth * 30
     property var    _mapControl:            mapControl
     property real   _widgetMargin:          ScreenTools.defaultFontPixelWidth * 0.75
+    property bool   _videoStream2Enabled:   QGroundControl.settingsManager.videoSettings.streamEnabled2.rawValue === true &&
+                                            QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue.length > 0 &&
+                                            QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue.toLowerCase().indexOf("rtsp://") === 0
+    property bool   _videoStream3Enabled:   QGroundControl.settingsManager.videoSettings.streamEnabled3.rawValue === true &&
+                                            QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue.length > 0 &&
+                                            QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue.toLowerCase().indexOf("rtsp://") === 0
 
     property real   _fullItemZorder:    0
     property real   _pipItemZorder:     QGroundControl.zOrderWidgets
+
+    Component.onCompleted: {
+        console.log("========== FlyView Debug Info ==========")
+        console.log("Stream 2 - Enabled:", QGroundControl.settingsManager.videoSettings.streamEnabled2.rawValue)
+        console.log("Stream 2 - URL:", QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue)
+        console.log("Stream 2 - URL Length:", QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue.length)
+        console.log("Stream 2 - _videoStream2Enabled:", _videoStream2Enabled)
+        console.log("Stream 3 - Enabled:", QGroundControl.settingsManager.videoSettings.streamEnabled3.rawValue)
+        console.log("Stream 3 - URL:", QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue)
+        console.log("Stream 3 - URL Length:", QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue.length)
+        console.log("Stream 3 - _videoStream3Enabled:", _videoStream3Enabled)
+        console.log("========================================")
+    }
+
+    // Monitor stream enabled state changes using Connections
+    Connections {
+        target: QGroundControl.settingsManager.videoSettings.streamEnabled2
+        function onRawValueChanged() {
+            console.log("FlyView: Stream 2 enabled changed to:", _videoStream2Enabled)
+        }
+    }
+
+    Connections {
+        target: QGroundControl.settingsManager.videoSettings.streamEnabled3
+        function onRawValueChanged() {
+            console.log("FlyView: Stream 3 enabled changed to:", _videoStream3Enabled)
+        }
+    }
 
     function _calcCenterViewPort() {
         var newToolInset = Qt.rect(0, 0, width, height)
@@ -64,8 +98,24 @@ Item {
         topEdgeLeftInset:       toolbar.height
         topEdgeCenterInset:     topEdgeLeftInset
         topEdgeRightInset:      topEdgeLeftInset
-        leftEdgeBottomInset:    _pipView.leftEdgeBottomInset
-        bottomEdgeLeftInset:    _pipView.bottomEdgeLeftInset
+        leftEdgeBottomInset:    _calcLeftEdgeBottomInset()
+        bottomEdgeLeftInset:    _calcBottomEdgeLeftInset()
+
+        function _calcLeftEdgeBottomInset() {
+            var maxInset = 0
+            if (_pipView.visible) maxInset = Math.max(maxInset, _pipView.leftEdgeBottomInset)
+            if (_pipView2.visible) maxInset = Math.max(maxInset, _pipView2.leftEdgeBottomInset)
+            if (_pipView3.visible) maxInset = Math.max(maxInset, _pipView3.leftEdgeBottomInset)
+            return maxInset
+        }
+
+        function _calcBottomEdgeLeftInset() {
+            var totalInset = 0
+            if (_pipView.visible) totalInset += _pipView.bottomEdgeLeftInset
+            if (_pipView2.visible) totalInset += _pipView2.height + _toolsMargin
+            if (_pipView3.visible) totalInset += _pipView3.height + _toolsMargin
+            return totalInset
+        }
     }
 
     Item {
@@ -102,6 +152,108 @@ Item {
 
             property real leftEdgeBottomInset: visible ? width + anchors.margins : 0
             property real bottomEdgeLeftInset: visible ? height + anchors.margins : 0
+        }
+
+        // Additional Video Stream 2 - Use Loader to prevent creation when disabled
+        Loader {
+            id:         videoControl2Loader
+            active:     _videoStream2Enabled
+            sourceComponent: Component {
+                FlyViewVideo2 {
+                    pipView: _pipView2
+                }
+            }
+
+            onActiveChanged: {
+                console.log("videoControl2Loader active changed to:", active, "(_videoStream2Enabled:", _videoStream2Enabled, ")")
+            }
+
+            onLoaded: {
+                console.log("videoControl2Loader: FlyViewVideo2 LOADED")
+            }
+        }
+
+        PipView {
+            id:                     _pipView2
+            anchors.left:           parent.left
+            anchors.bottom:         _pipView.visible ? _pipView.top : parent.bottom
+            anchors.margins:        _toolsMargin
+            item1IsFullSettingsKey: "VideoStream2IsFullWindow"
+            item1:                  videoControl2Loader.item  // Reference Loader's item
+            item2:                  videoControl2Loader.item  // Reference Loader's item
+            show:                   _videoStream2Enabled && videoControl2Loader.item && !QGroundControl.videoManager.fullScreen
+            z:                      QGroundControl.zOrderWidgets
+
+            Component.onCompleted: {
+                console.log("PipView2: Created, show:", show, "visible:", visible)
+            }
+
+            // Force pip mode when item becomes available (but don't swap since item1 === item2)
+            onItem1Changed: {
+                if (item1 && item1 === item2) {
+                    var savedState = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, false)
+                    item1.pipState.state = savedState ? item1.pipState.fullState : item1.pipState.pipState
+                    console.log("PipView2: Set initial state to:", item1.pipState.state)
+                }
+            }
+
+            onVisibleChanged: {
+                console.log("PipView2: Visible changed to:", visible, "show:", show)
+            }
+
+            onShowChanged: {
+                console.log("PipView2: Show changed to:", show, "enabled:", _videoStream2Enabled)
+            }
+
+            property real leftEdgeBottomInset: visible ? width + anchors.margins : 0
+            property real bottomEdgeLeftInset: visible ? height + anchors.margins + (_pipView.visible ? _pipView.height + anchors.margins : 0) : 0
+        }
+
+        // Additional Video Stream 3 - Use Loader to prevent creation when disabled
+        Loader {
+            id:         videoControl3Loader
+            active:     _videoStream3Enabled
+            sourceComponent: Component {
+                FlyViewVideo3 {
+                    pipView: _pipView3
+                }
+            }
+
+            onActiveChanged: {
+                console.log("videoControl3Loader active changed to:", active, "(_videoStream3Enabled:", _videoStream3Enabled, ")")
+            }
+
+            onLoaded: {
+                console.log("videoControl3Loader: FlyViewVideo3 LOADED")
+            }
+        }
+
+        PipView {
+            id:                     _pipView3
+            anchors.left:           parent.left
+            anchors.bottom:         _pipView2.visible ? _pipView2.top : (_pipView.visible ? _pipView.top : parent.bottom)
+            anchors.margins:        _toolsMargin
+            item1IsFullSettingsKey: "VideoStream3IsFullWindow"
+            item1:                  videoControl3Loader.item  // Reference Loader's item
+            item2:                  videoControl3Loader.item  // Reference Loader's item
+            show:                   _videoStream3Enabled && videoControl3Loader.item && !QGroundControl.videoManager.fullScreen
+            z:                      QGroundControl.zOrderWidgets
+
+            Component.onCompleted: {
+                console.log("PipView3: Created, show:", show, "visible:", visible)
+            }
+
+            // Force pip mode when item becomes available (but don't swap since item1 === item2)
+            onItem1Changed: {
+                if (item1 && item1 === item2) {
+                    var savedState = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, false)
+                    item1.pipState.state = savedState ? item1.pipState.fullState : item1.pipState.pipState
+                    console.log("PipView3: Set initial state to:", item1.pipState.state)
+                }
+            }
+
+            property real leftEdgeBottomInset: visible ? width + anchors.margins : 0
+            property real bottomEdgeLeftInset: visible ? height + anchors.margins + (_pipView2.visible ? _pipView2.bottomEdgeLeftInset : (_pipView.visible ? _pipView.height + anchors.margins : 0)) : 0
         }
 
         FlyViewWidgetLayer {
