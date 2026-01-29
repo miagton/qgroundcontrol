@@ -84,6 +84,13 @@ void VideoManager::init(QQuickWindow *mainWindow)
     (void) connect(_videoSettings->tcpUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->aspectRatio(), &Fact::rawValueChanged, this, &VideoManager::aspectRatioChanged);
     (void) connect(_videoSettings->lowLatencyMode(), &Fact::rawValueChanged, this, [this](const QVariant &value) { Q_UNUSED(value); _restartAllVideos(); });
+
+    // Additional video streams
+    (void) connect(_videoSettings->streamEnabled2(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
+    (void) connect(_videoSettings->rtspUrl2(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
+    (void) connect(_videoSettings->streamEnabled3(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
+    (void) connect(_videoSettings->rtspUrl3(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
+
     (void) connect(MultiVehicleManager::instance(), &MultiVehicleManager::activeVehicleChanged, this, &VideoManager::_setActiveVehicle);
 
     (void) connect(this, &VideoManager::autoStreamConfiguredChanged, this, &VideoManager::_videoSourceChanged);
@@ -109,7 +116,9 @@ void VideoManager::_initAfterQmlIsReady()
 
     static const QStringList videoStreamList = {
         "videoContent",
-        "thermalVideo"
+        "thermalVideo",
+        "videoContent2",
+        "videoContent3"
     };
     for (const QString &streamName : videoStreamList) {
         VideoReceiver *receiver = QGCCorePlugin::instance()->createVideoReceiver(this);
@@ -510,6 +519,36 @@ bool VideoManager::_updateSettings(VideoReceiver *receiver)
         return settingsChanged;
     }
 
+    // Handle additional video streams (videoContent2 and videoContent3)
+    if (receiver->name() == "videoContent2") {
+        if (_videoSettings->streamEnabled2()->rawValue().toBool()) {
+            const QString rtspUrl2 = _videoSettings->rtspUrl2()->rawValue().toString();
+            if (!rtspUrl2.isEmpty()) {
+                settingsChanged |= _updateVideoUri(receiver, rtspUrl2);
+            } else {
+                settingsChanged |= _updateVideoUri(receiver, QString());
+            }
+        } else {
+            settingsChanged |= _updateVideoUri(receiver, QString());
+        }
+        return settingsChanged;
+    }
+
+    if (receiver->name() == "videoContent3") {
+        if (_videoSettings->streamEnabled3()->rawValue().toBool()) {
+            const QString rtspUrl3 = _videoSettings->rtspUrl3()->rawValue().toString();
+            if (!rtspUrl3.isEmpty()) {
+                settingsChanged |= _updateVideoUri(receiver, rtspUrl3);
+            } else {
+                settingsChanged |= _updateVideoUri(receiver, QString());
+            }
+        } else {
+            settingsChanged |= _updateVideoUri(receiver, QString());
+        }
+        return settingsChanged;
+    }
+
+    // Original logic for primary video stream (videoContent)
     settingsChanged |= _updateUVC(receiver);
     settingsChanged |= _updateAutoStream(receiver);
 
