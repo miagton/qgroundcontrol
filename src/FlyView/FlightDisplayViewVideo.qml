@@ -10,6 +10,35 @@ Item {
     id:     root
     clip:   true
 
+    // ========== Configurable Properties for Multi-Stream Support ==========
+    // streamIndex: 0 = primary (videoContent), 1 = stream2 (videoContent2), 2 = stream3 (videoContent3)
+    property int    streamIndex:        0
+    property string videoContentName:   streamIndex === 0 ? "videoContent" : ("videoContent" + (streamIndex + 1))
+
+    // Stream-specific settings based on streamIndex
+    property bool   _streamEnabled: {
+        if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.streamEnabled.rawValue
+        if (streamIndex === 1) return QGroundControl.settingsManager.videoSettings.streamEnabled2.rawValue
+        if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.streamEnabled3.rawValue
+        return false
+    }
+    property string _streamUrl: {
+        if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.rtspUrl.rawValue
+        if (streamIndex === 1) return QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue
+        if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue
+        return ""
+    }
+    property bool   _streamConfigured:  _streamEnabled && _streamUrl.length > 0
+    property string _streamLabel:       streamIndex === 0 ? qsTr("VIDEO") : qsTr("STREAM %1").arg(streamIndex + 1)
+
+    // For all streams, use VideoManager's decoding state for primary stream
+    // For additional streams, we don't have per-stream decoding tracking yet,
+    // so show the waiting image (visible: !_isDecoding) until we implement that
+    // For now, additional streams will show video background when configured (black until video arrives)
+    // but the noVideo image visibility is controlled separately below
+    property bool   _isDecoding:        streamIndex === 0 ? QGroundControl.videoManager.decoding : false
+
+    // ========== Common Properties ==========
     property bool useSmallFont: true
 
     property double _ar:                QGroundControl.videoManager.gstreamerEnabled
@@ -36,49 +65,20 @@ Item {
         return videoBackground.getHeight()
     }
 
-    property double _thermalHeightFactor: 0.85 //-- TODO
+    property double _thermalHeightFactor: 0.85
 
-        Image {
-            id:             noVideo
-            anchors.fill:   parent
-            source:         "/res/NoVideoBackground.jpg"
-            fillMode:       Image.PreserveAspectCrop
-            visible:        !(QGroundControl.videoManager.decoding)
-
-            Rectangle {
-                anchors.centerIn:   parent
-                width:              noVideoLabel.contentWidth + ScreenTools.defaultFontPixelHeight
-                height:             noVideoLabel.contentHeight + ScreenTools.defaultFontPixelHeight
-                radius:             ScreenTools.defaultFontPixelWidth / 2
-                color:              "black"
-                opacity:            0.5
-            }
-
-            QGCLabel {
-                id:                 noVideoLabel
-                text:               QGroundControl.settingsManager.videoSettings.streamEnabled.rawValue ? qsTr("WAITING FOR VIDEO") : qsTr("VIDEO DISABLED")
-                font.bold:          true
-                color:              "white"
-                font.pointSize:     useSmallFont ? ScreenTools.smallFontPointSize : ScreenTools.largeFontPointSize
-                anchors.centerIn:   parent
-            }
-        }
-
+    // Video background with GstGLQt6VideoItem - ALWAYS visible so VideoManager can bind to it
     Rectangle {
         id:             videoBackground
         anchors.fill:   parent
         color:          "black"
-        visible:        QGroundControl.videoManager.decoding
+        z:              0  // Behind the noVideo image
+
         function getWidth() {
             if(_ar != 0.0){
                 if(_isMode_FIT_HEIGHT
                         || (_isMode_FILL && (root.width/root.height < _ar))
                         || (_isMode_NO_CROP && (root.width/root.height > _ar))){
-                    // This return value has different implications depending on the mode
-                    // For FIT_HEIGHT and FILL
-                    //    makes so the video width will be larger than (or equal to) the screen width
-                    // For NO_CROP Mode
-                    //    makes so the video width will be smaller than (or equal to) the screen width
                     return root.height * _ar
                 }
             }
@@ -89,83 +89,71 @@ Item {
                 if(_isMode_FIT_WIDTH
                         || (_isMode_FILL && (root.width/root.height > _ar))
                         || (_isMode_NO_CROP && (root.width/root.height < _ar))){
-                    // This return value has different implications depending on the mode
-                    // For FIT_WIDTH and FILL
-                    //    makes so the video height will be larger than (or equal to) the screen height
-                    // For NO_CROP Mode
-                    //    makes so the video height will be smaller than (or equal to) the screen height
                     return root.width * (1 / _ar)
                 }
             }
             return root.height
         }
-        Component {
-            id: videoBackgroundComponent
-            QGCVideoBackground {
-                id:             videoContent
-                objectName:     "videoContent"
 
-                Connections {
-                    target: QGroundControl.videoManager
-                    function onImageFileChanged(filename) {
-                        videoContent.grabToImage(function(result) {
-                            if (!result.saveToFile(filename)) {
-                                console.error('Error capturing video frame');
-                            }
-                        });
-                    }
-                }
+        // Video content with dynamic objectName based on streamIndex
+        QGCVideoBackground {
+            id:             videoContent
+            objectName:     root.videoContentName
+            height:         parent.getHeight()
+            width:          parent.getWidth()
+            anchors.centerIn: parent
 
-                Rectangle {
-                    color:  Qt.rgba(1,1,1,0.5)
-                    height: parent.height
-                    width:  1
-                    x:      parent.width * 0.33
-                    visible: _showGrid && !QGroundControl.videoManager.fullScreen
-                }
-                Rectangle {
-                    color:  Qt.rgba(1,1,1,0.5)
-                    height: parent.height
-                    width:  1
-                    x:      parent.width * 0.66
-                    visible: _showGrid && !QGroundControl.videoManager.fullScreen
-                }
-                Rectangle {
-                    color:  Qt.rgba(1,1,1,0.5)
-                    width:  parent.width
-                    height: 1
-                    y:      parent.height * 0.33
-                    visible: _showGrid && !QGroundControl.videoManager.fullScreen
-                }
-                Rectangle {
-                    color:  Qt.rgba(1,1,1,0.5)
-                    width:  parent.width
-                    height: 1
-                    y:      parent.height * 0.66
-                    visible: _showGrid && !QGroundControl.videoManager.fullScreen
+            Connections {
+                target: QGroundControl.videoManager
+                enabled: root.streamIndex === 0  // Only primary stream handles screenshot
+                function onImageFileChanged(filename) {
+                    videoContent.grabToImage(function(result) {
+                        if (!result.saveToFile(filename)) {
+                            console.error('Error capturing video frame');
+                        }
+                    });
                 }
             }
-        }
-        Loader {
-            // GStreamer is causing crashes on Lenovo laptop OpenGL Intel drivers. In order to workaround this
-            // we don't load a QGCVideoBackground object when video is disabled. This prevents any video rendering
-            // code from running. Hence the Loader to completely remove it.
-            height:             parent.getHeight()
-            width:              parent.getWidth()
-            anchors.centerIn:   parent
-            visible:            QGroundControl.videoManager.decoding
-            sourceComponent:    videoBackgroundComponent
 
-            property bool videoDisabled: QGroundControl.settingsManager.videoSettings.videoSource.rawValue === QGroundControl.settingsManager.videoSettings.disabledVideoSource
+            // Grid overlay - only for primary stream
+            Rectangle {
+                color:  Qt.rgba(1,1,1,0.5)
+                height: parent.height
+                width:  1
+                x:      parent.width * 0.33
+                visible: root.streamIndex === 0 && _showGrid && !QGroundControl.videoManager.fullScreen
+            }
+            Rectangle {
+                color:  Qt.rgba(1,1,1,0.5)
+                height: parent.height
+                width:  1
+                x:      parent.width * 0.66
+                visible: root.streamIndex === 0 && _showGrid && !QGroundControl.videoManager.fullScreen
+            }
+            Rectangle {
+                color:  Qt.rgba(1,1,1,0.5)
+                width:  parent.width
+                height: 1
+                y:      parent.height * 0.33
+                visible: root.streamIndex === 0 && _showGrid && !QGroundControl.videoManager.fullScreen
+            }
+            Rectangle {
+                color:  Qt.rgba(1,1,1,0.5)
+                width:  parent.width
+                height: 1
+                y:      parent.height * 0.66
+                visible: root.streamIndex === 0 && _showGrid && !QGroundControl.videoManager.fullScreen
+            }
         }
 
-        //-- Thermal Image
+        //-- Thermal Image (only for primary stream)
         Item {
             id:                 thermalItem
+            visible:            root.streamIndex === 0 && QGroundControl.videoManager.hasThermal && _camera && _camera.thermalMode !== MavlinkCameraControl.THERMAL_OFF
             width:              height * QGroundControl.videoManager.thermalAspectRatio
             height:             _camera ? (_camera.thermalMode === MavlinkCameraControl.THERMAL_FULL ? parent.height : (_camera.thermalMode === MavlinkCameraControl.THERMAL_PIP ? ScreenTools.defaultFontPixelHeight * 12 : parent.height * _thermalHeightFactor)) : 0
             anchors.centerIn:   parent
-            visible:            QGroundControl.videoManager.hasThermal && _camera.thermalMode !== MavlinkCameraControl.THERMAL_OFF
+
             function pipOrNot() {
                 if(_camera) {
                     if(_camera.thermalMode === MavlinkCameraControl.THERMAL_PIP) {
@@ -197,10 +185,11 @@ Item {
                 opacity:        _camera ? (_camera.thermalMode === MavlinkCameraControl.THERMAL_BLEND ? _camera.thermalOpacity / 100 : 1.0) : 0
             }
         }
-        //-- Zoom
+
+        //-- Zoom (only for primary stream with camera)
         PinchArea {
             id:             pinchZoom
-            enabled:        _hasZoom
+            enabled:        root.streamIndex === 0 && _hasZoom
             anchors.fill:   parent
             onPinchStarted: pinchZoom.zoom = 0
             onPinchUpdated: {
@@ -219,4 +208,33 @@ Item {
             property int zoom: 0
         }
     }
+
+    // "Waiting for video" landscape image - shows on top when not decoding
+    Image {
+        id:             noVideo
+        anchors.fill:   parent
+        source:         "/res/NoVideoBackground.jpg"
+        fillMode:       Image.PreserveAspectCrop
+        visible:        !_isDecoding
+        z:              1  // On top of video background
+
+        Rectangle {
+            anchors.centerIn:   parent
+            width:              noVideoLabel.contentWidth + ScreenTools.defaultFontPixelHeight
+            height:             noVideoLabel.contentHeight + ScreenTools.defaultFontPixelHeight
+            radius:             ScreenTools.defaultFontPixelWidth / 2
+            color:              "black"
+            opacity:            0.5
+        }
+
+        QGCLabel {
+            id:                 noVideoLabel
+            text:               _streamEnabled ? qsTr("WAITING FOR %1").arg(_streamLabel) : qsTr("%1 DISABLED").arg(_streamLabel)
+            font.bold:          true
+            color:              "white"
+            font.pointSize:     useSmallFont ? ScreenTools.smallFontPointSize : ScreenTools.largeFontPointSize
+            anchors.centerIn:   parent
+        }
+    }
 }
+

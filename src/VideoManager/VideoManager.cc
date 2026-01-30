@@ -534,13 +534,16 @@ bool VideoManager::_updateSettings(VideoReceiver *receiver)
 
     // Handle additional video streams (videoContent2 and videoContent3)
     if (receiver->name() == "videoContent2") {
-        if (_videoSettings->streamEnabled2()->rawValue().toBool()) {
-            const QString rtspUrl2 = _videoSettings->rtspUrl2()->rawValue().toString();
-            if (!rtspUrl2.isEmpty()) {
-                settingsChanged |= _updateVideoUri(receiver, rtspUrl2);
-            } else {
-                settingsChanged |= _updateVideoUri(receiver, QString());
-            }
+        const bool enabled = _videoSettings->streamEnabled2()->rawValue().toBool();
+        const QString rtspUrl2 = _videoSettings->rtspUrl2()->rawValue().toString().trimmed();
+        qCDebug(VideoManagerLog) << "Configuring videoContent2: enabled=" << enabled << "url=" << rtspUrl2;
+
+        // Validate URL before using it
+        if (enabled && !rtspUrl2.isEmpty() &&
+            (rtspUrl2.startsWith("rtsp://", Qt::CaseInsensitive) ||
+             rtspUrl2.startsWith("rtspt://", Qt::CaseInsensitive) ||
+             rtspUrl2.startsWith("rtsps://", Qt::CaseInsensitive))) {
+            settingsChanged |= _updateVideoUri(receiver, rtspUrl2);
         } else {
             settingsChanged |= _updateVideoUri(receiver, QString());
         }
@@ -548,13 +551,16 @@ bool VideoManager::_updateSettings(VideoReceiver *receiver)
     }
 
     if (receiver->name() == "videoContent3") {
-        if (_videoSettings->streamEnabled3()->rawValue().toBool()) {
-            const QString rtspUrl3 = _videoSettings->rtspUrl3()->rawValue().toString();
-            if (!rtspUrl3.isEmpty()) {
-                settingsChanged |= _updateVideoUri(receiver, rtspUrl3);
-            } else {
-                settingsChanged |= _updateVideoUri(receiver, QString());
-            }
+        const bool enabled = _videoSettings->streamEnabled3()->rawValue().toBool();
+        const QString rtspUrl3 = _videoSettings->rtspUrl3()->rawValue().toString().trimmed();
+        qCDebug(VideoManagerLog) << "Configuring videoContent3: enabled=" << enabled << "url=" << rtspUrl3;
+
+        // Validate URL before using it
+        if (enabled && !rtspUrl3.isEmpty() &&
+            (rtspUrl3.startsWith("rtsp://", Qt::CaseInsensitive) ||
+             rtspUrl3.startsWith("rtspt://", Qt::CaseInsensitive) ||
+             rtspUrl3.startsWith("rtsps://", Qt::CaseInsensitive))) {
+            settingsChanged |= _updateVideoUri(receiver, rtspUrl3);
         } else {
             settingsChanged |= _updateVideoUri(receiver, QString());
         }
@@ -740,21 +746,17 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
     }
     receiver->setWidget(widget);
 
-    // For additional streams, their widget may not exist yet at startup (Loader-created).
-    // Creating the sink with a null widget has led to stalls/hangs on some systems.
-    // We'll create the sink later in the retry loop once the widget is available.
-    const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") || receiver->name() == QStringLiteral("videoContent3"));
-    if (!isAdditionalStream) {
-        if (!receiver->widget()) {
-            qCWarning(VideoManagerLog) << "Primary stream widget missing, skipping start" << receiver->name();
-            return;
-        }
+    // Create the video sink if we have a widget
+    if (receiver->widget()) {
         void *sink = QGCCorePlugin::instance()->createVideoSink(receiver->widget(), receiver);
         if (!sink) {
             qCCritical(VideoManagerLog) << "createVideoSink() failed" << receiver->name();
-            return;
+        } else {
+            receiver->setSink(sink);
+            qCDebug(VideoManagerLog) << "Video sink created for" << receiver->name();
         }
-        receiver->setSink(sink);
+    } else {
+        qCWarning(VideoManagerLog) << "Widget not available, cannot create sink for" << receiver->name();
     }
 
     (void) connect(receiver, &VideoReceiver::onStartComplete, this, [this, receiver](VideoReceiver::STATUS status) {
@@ -791,10 +793,17 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
         if (status == VideoReceiver::STATUS_INVALID_URL) {
             qCDebug(VideoManagerLog) << "Invalid video URL. Not restarting";
         } else {
-            QTimer::singleShot(1000, receiver, [this, receiver]() {
-                qCDebug(VideoManagerLog) << "Restarting video receiver" << receiver->name() << receiver->uri();
-                _startReceiver(receiver);
-            });
+            // Don't auto-restart additional streams to avoid infinite loops on failure
+            const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") ||
+                                             receiver->name() == QStringLiteral("videoContent3"));
+            if (isAdditionalStream) {
+                qCDebug(VideoManagerLog) << "Additional stream stopped, not auto-restarting" << receiver->name();
+            } else {
+                QTimer::singleShot(1000, receiver, [this, receiver]() {
+                    qCDebug(VideoManagerLog) << "Restarting video receiver" << receiver->name() << receiver->uri();
+                    _startReceiver(receiver);
+                });
+            }
         }
     });
 
@@ -862,53 +871,14 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
     if (hasVideo()) {
         const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") || receiver->name() == QStringLiteral("videoContent3"));
 
-        // Additional streams are created from QML Loaders and their widgets may not exist yet at startup.
-        // Starting before a widget/sink exists can lead to backend stalls on some platforms.
+        // Additional streams need their widget/sink which may not exist yet at startup.
+        // We only start them if they have a valid widget and sink.
         if (isAdditionalStream) {
-            constexpr int kMaxWidgetRetries = 20;      // ~10s total
-            constexpr int kRetryIntervalMs  = 500;
-
-            auto tryStart = std::make_shared<std::function<void(int)>>();
-            *tryStart = [this, receiver, window, tryStart](int attempt) {
-                 if (!receiver) {
-                     return;
-                 }
-
-                 // If widget/sink isn't ready yet, try to bind them again.
-                 if (!receiver->widget()) {
-                     QQuickItem *w = window ? window->findChild<QQuickItem*>(receiver->name()) : nullptr;
-                     if (w) {
-                         receiver->setWidget(w);
-                     }
-                 }
-
-                 if (receiver->widget() && !receiver->sink()) {
-                     void *s = QGCCorePlugin::instance()->createVideoSink(receiver->widget(), receiver);
-                     if (s) {
-                         receiver->setSink(s);
-                     }
-                 }
-
-                 // Start only once we have both widget and sink
-                 if (receiver->widget() && receiver->sink()) {
-                     _startReceiver(receiver);
-                     return;
-                 }
-
-                 if (attempt >= kMaxWidgetRetries) {
-                     qCWarning(VideoManagerLog) << "Giving up waiting for video widget/sink for" << receiver->name();
-                     return;
-                 }
-
-                 QTimer::singleShot(kRetryIntervalMs, this, [attempt, tryStart]() {
-                    (*tryStart)(attempt + 1);
-                 });
-             };
-
-             // Delay first attempt to give QML time to instantiate the Loader content.
-             QTimer::singleShot(1500, this, [tryStart]() {
-                (*tryStart)(0);
-             });
+            if (receiver->widget() && receiver->sink()) {
+                _startReceiver(receiver);
+            } else {
+                qCDebug(VideoManagerLog) << "Additional stream widget/sink not ready yet, will start when available" << receiver->name();
+            }
         } else {
             if (receiver->widget() && receiver->sink()) {
                 _startReceiver(receiver);

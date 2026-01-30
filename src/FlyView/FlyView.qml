@@ -46,12 +46,18 @@ Item {
     property real   _rightPanelWidth:       ScreenTools.defaultFontPixelWidth * 30
     property var    _mapControl:            mapControl
     property real   _widgetMargin:          ScreenTools.defaultFontPixelWidth * 0.75
+    property string _rtspUrl2:              QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue
+    property string _rtspUrl3:              QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue
     property bool   _videoStream2Enabled:   QGroundControl.settingsManager.videoSettings.streamEnabled2.rawValue === true &&
-                                            QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue.length > 0 &&
-                                            QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue.toLowerCase().indexOf("rtsp://") === 0
+                                            _rtspUrl2.length > 0 &&
+                                            (_rtspUrl2.toLowerCase().startsWith("rtsp://") ||
+                                             _rtspUrl2.toLowerCase().startsWith("rtspt://") ||
+                                             _rtspUrl2.toLowerCase().startsWith("rtsps://"))
     property bool   _videoStream3Enabled:   QGroundControl.settingsManager.videoSettings.streamEnabled3.rawValue === true &&
-                                            QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue.length > 0 &&
-                                            QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue.toLowerCase().indexOf("rtsp://") === 0
+                                            _rtspUrl3.length > 0 &&
+                                            (_rtspUrl3.toLowerCase().startsWith("rtsp://") ||
+                                             _rtspUrl3.toLowerCase().startsWith("rtspt://") ||
+                                             _rtspUrl3.toLowerCase().startsWith("rtsps://"))
 
     property real   _fullItemZorder:    0
     property real   _pipItemZorder:     QGroundControl.zOrderWidgets
@@ -136,6 +142,7 @@ Item {
         FlyViewVideo {
             id:         videoControl
             pipView:    _pipView
+            streamIndex: 0  // Primary stream
         }
 
         PipView {
@@ -154,13 +161,14 @@ Item {
             property real bottomEdgeLeftInset: visible ? height + anchors.margins : 0
         }
 
-        // Additional Video Stream 2 - Use Loader to prevent creation when disabled
+        // Additional Video Stream 2 - Uses modular FlyViewVideo with streamIndex=1
         Loader {
             id:         videoControl2Loader
             active:     _videoStream2Enabled
             sourceComponent: Component {
-                FlyViewVideo2 {
-                    pipView: _pipView2
+                FlyViewVideo {
+                    pipView:     _pipView2
+                    streamIndex: 1  // Stream 2
                 }
             }
 
@@ -169,7 +177,7 @@ Item {
             }
 
             onLoaded: {
-                console.log("videoControl2Loader: FlyViewVideo2 LOADED")
+                console.log("videoControl2Loader: FlyViewVideo (stream 2) LOADED")
             }
         }
 
@@ -179,8 +187,8 @@ Item {
             anchors.bottom:         _pipView.visible ? _pipView.top : parent.bottom
             anchors.margins:        _toolsMargin
             item1IsFullSettingsKey: "VideoStream2IsFullWindow"
-            item1:                  videoControl2Loader.item  // Reference Loader's item
-            item2:                  videoControl2Loader.item  // Reference Loader's item
+            item1:                  videoControl2Loader.item
+            item2:                  videoControl2Loader.item
             show:                   _videoStream2Enabled && videoControl2Loader.item && !QGroundControl.videoManager.fullScreen
             z:                      QGroundControl.zOrderWidgets
 
@@ -188,7 +196,6 @@ Item {
                 console.log("PipView2: Created, show:", show, "visible:", visible)
             }
 
-            // Force pip mode when item becomes available (but don't swap since item1 === item2)
             onItem1Changed: {
                 if (item1 && item1 === item2) {
                     var savedState = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, false)
@@ -209,13 +216,14 @@ Item {
             property real bottomEdgeLeftInset: visible ? height + anchors.margins + (_pipView.visible ? _pipView.height + anchors.margins : 0) : 0
         }
 
-        // Additional Video Stream 3 - Use Loader to prevent creation when disabled
+        // Additional Video Stream 3 - Uses modular FlyViewVideo with streamIndex=2
         Loader {
             id:         videoControl3Loader
             active:     _videoStream3Enabled
             sourceComponent: Component {
-                FlyViewVideo3 {
-                    pipView: _pipView3
+                FlyViewVideo {
+                    pipView:     _pipView3
+                    streamIndex: 2  // Stream 3
                 }
             }
 
@@ -224,7 +232,7 @@ Item {
             }
 
             onLoaded: {
-                console.log("videoControl3Loader: FlyViewVideo3 LOADED")
+                console.log("videoControl3Loader: FlyViewVideo (stream 3) LOADED")
             }
         }
 
@@ -234,8 +242,8 @@ Item {
             anchors.bottom:         _pipView2.visible ? _pipView2.top : (_pipView.visible ? _pipView.top : parent.bottom)
             anchors.margins:        _toolsMargin
             item1IsFullSettingsKey: "VideoStream3IsFullWindow"
-            item1:                  videoControl3Loader.item  // Reference Loader's item
-            item2:                  videoControl3Loader.item  // Reference Loader's item
+            item1:                  videoControl3Loader.item
+            item2:                  videoControl3Loader.item
             show:                   _videoStream3Enabled && videoControl3Loader.item && !QGroundControl.videoManager.fullScreen
             z:                      QGroundControl.zOrderWidgets
 
@@ -243,7 +251,6 @@ Item {
                 console.log("PipView3: Created, show:", show, "visible:", visible)
             }
 
-            // Force pip mode when item becomes available (but don't swap since item1 === item2)
             onItem1Changed: {
                 if (item1 && item1 === item2) {
                     var savedState = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, false)

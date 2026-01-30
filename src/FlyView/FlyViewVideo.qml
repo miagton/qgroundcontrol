@@ -6,11 +6,16 @@ import QGroundControl.Controls
 Item {
     id: _root
 
-    property Item pipView
-    property Item pipState: videoPipState
+    // ========== Configurable Properties for Multi-Stream Support ==========
+    property int    streamIndex:    0   // 0 = primary, 1 = stream2, 2 = stream3
+    property Item   pipView
+    property Item   pipState:       videoPipState
 
-    property int    _track_rec_x:       0
-    property int    _track_rec_y:       0
+    // Only primary stream controls VideoManager start/stop
+    property bool   _isPrimaryStream: streamIndex === 0
+
+    property int    _track_rec_x:   0
+    property int    _track_rec_y:   0
 
     PipState {
         id:         videoPipState
@@ -18,17 +23,21 @@ Item {
         isDark:     true
 
         onWindowAboutToOpen: {
-            QGroundControl.videoManager.stopVideo()
-            videoStartDelay.start()
+            if (_isPrimaryStream) {
+                QGroundControl.videoManager.stopVideo()
+                videoStartDelay.start()
+            }
         }
 
         onWindowAboutToClose: {
-            QGroundControl.videoManager.stopVideo()
-            videoStartDelay.start()
+            if (_isPrimaryStream) {
+                QGroundControl.videoManager.stopVideo()
+                videoStartDelay.start()
+            }
         }
 
         onStateChanged: {
-            if (pipState.state !== pipState.fullState) {
+            if (_isPrimaryStream && pipState.state !== pipState.fullState) {
                 QGroundControl.videoManager.fullScreen = false
             }
         }
@@ -36,31 +45,38 @@ Item {
 
     Timer {
         id:           videoStartDelay
-        interval:     2000;
+        interval:     2000
         running:      false
         repeat:       false
-        onTriggered:  QGroundControl.videoManager.startVideo()
+        onTriggered:  {
+            if (_isPrimaryStream) {
+                QGroundControl.videoManager.startVideo()
+            }
+        }
     }
 
     //-- Video Streaming
     FlightDisplayViewVideo {
         id:             videoStreaming
         anchors.fill:   parent
+        streamIndex:    _root.streamIndex
         useSmallFont:   _root.pipState.state !== _root.pipState.fullState
-        visible:        QGroundControl.videoManager.isStreamSource
+        visible:        _isPrimaryStream ? QGroundControl.videoManager.isStreamSource : true
     }
-    //-- UVC Video (USB Camera or Video Device)
+
+    //-- UVC Video (USB Camera or Video Device) - only for primary stream
     Loader {
         id:             cameraLoader
         anchors.fill:   parent
-        visible:        QGroundControl.videoManager.isUvc
+        visible:        _isPrimaryStream && QGroundControl.videoManager.isUvc
+        active:         _isPrimaryStream
         source:         QGroundControl.videoManager.uvcEnabled ? "qrc:/qml/QGroundControl/FlyView/FlightDisplayViewUVC.qml" : "qrc:/qml/QGroundControl/FlyView//FlightDisplayViewDummy.qml"
     }
 
     QGCLabel {
         text: qsTr("Double-click to exit full screen")
         font.pointSize: ScreenTools.largeFontPointSize
-        visible: QGroundControl.videoManager.fullScreen && flyViewVideoMouseArea.containsMouse
+        visible: _isPrimaryStream && QGroundControl.videoManager.fullScreen && flyViewVideoMouseArea.containsMouse
         anchors.centerIn: parent
 
         onVisibleChanged: {
@@ -78,12 +94,14 @@ Item {
         }
     }
 
+    // Gimbal controller - only for primary stream
     OnScreenGimbalController {
         id:                      onScreenGimbalController
         anchors.fill:            parent
+        visible:                 _isPrimaryStream
         screenX:                 flyViewVideoMouseArea.mouseX
         screenY:                 flyViewVideoMouseArea.mouseY
-        cameraTrackingEnabled:   videoStreaming._camera && videoStreaming._camera.trackingEnabled
+        cameraTrackingEnabled:   _isPrimaryStream && videoStreaming._camera && videoStreaming._camera.trackingEnabled
     }
 
     MouseArea {
@@ -100,12 +118,13 @@ Item {
         property double offset_y:   0
         property double radius:     20
         property var trackingROI:   null
-        property var trackingStatus: trackingStatusComponent.createObject(flyViewVideoMouseArea, {})
+        property var trackingStatus: _isPrimaryStream ? trackingStatusComponent.createObject(flyViewVideoMouseArea, {}) : null
 
-        onClicked:       onScreenGimbalController.clickControl()
-        onDoubleClicked: QGroundControl.videoManager.fullScreen = !QGroundControl.videoManager.fullScreen
+        onClicked:       { if (_isPrimaryStream) onScreenGimbalController.clickControl() }
+        onDoubleClicked: { if (_isPrimaryStream) QGroundControl.videoManager.fullScreen = !QGroundControl.videoManager.fullScreen }
 
         onPressed:(mouse) => {
+            if (!_isPrimaryStream) return
             onScreenGimbalController.pressControl()
 
             _track_rec_x = mouse.x
@@ -122,6 +141,7 @@ Item {
             }
         }
         onPositionChanged: (mouse) => {
+            if (!_isPrimaryStream) return
             //on move, update the width of rectangle
             if (trackingROI !== null) {
                 if (mouse.x < trackingROI.x) {
@@ -139,6 +159,7 @@ Item {
             }
         }
         onReleased: (mouse) => {
+            if (!_isPrimaryStream) return
             onScreenGimbalController.releaseControl()
 
             //if there is already a selection, delete it
@@ -209,8 +230,9 @@ Item {
             id: trackingStatusTimer
             interval:               50
             repeat:                 true
-            running:                true
+            running:                _isPrimaryStream
             onTriggered: {
+                if (!_isPrimaryStream) return
                 if (videoStreaming._camera) {
                     if (videoStreaming._camera.trackingEnabled && videoStreaming._camera.trackingImageStatus) {
                         var margin_hor = (parent.parent.width - videoStreaming.getWidth()) / 2
@@ -237,13 +259,17 @@ Item {
         }
     }
 
-    ProximityRadarVideoView{
+    // Proximity radar - only for primary stream
+    ProximityRadarVideoView {
         anchors.fill:   parent
+        visible:        _isPrimaryStream
         vehicle:        QGroundControl.multiVehicleManager.activeVehicle
     }
 
+    // Obstacle distance overlay - only for primary stream
     ObstacleDistanceOverlayVideo {
         id: obstacleDistance
+        visible: _isPrimaryStream
         showText: pipState.state === pipState.fullState
     }
 }

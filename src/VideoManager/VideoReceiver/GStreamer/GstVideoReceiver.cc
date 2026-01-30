@@ -624,13 +624,18 @@ GstElement *GstVideoReceiver::_makeSource(const QString &input)
         return nullptr;
     }
 
+    qCDebug(GstVideoReceiverLog) << "_makeSource called with input:" << input;
+
     const QUrl sourceUrl(input);
+    qCDebug(GstVideoReceiverLog) << "_makeSource: scheme=" << sourceUrl.scheme() << "host=" << sourceUrl.host() << "port=" << sourceUrl.port();
 
     const bool isRtsp = sourceUrl.scheme().startsWith("rtsp", Qt::CaseInsensitive);
     const bool isUdp264 = input.contains("udp://", Qt::CaseInsensitive);
     const bool isUdp265 = input.contains("udp265://", Qt::CaseInsensitive);
     const bool isUdpMPEGTS = input.contains("mpegts://", Qt::CaseInsensitive);
     const bool isTcpMPEGTS = input.contains("tcp://", Qt::CaseInsensitive);
+
+    qCDebug(GstVideoReceiverLog) << "_makeSource: isRtsp=" << isRtsp << "isUdp264=" << isUdp264 << "isUdp265=" << isUdp265;
 
     GstElement *source = nullptr;
     GstElement *buffer = nullptr;
@@ -703,11 +708,11 @@ GstElement *GstVideoReceiver::_makeSource(const QString &input)
                 gst_clear_caps(&caps);
             }
         } else {
-            qCDebug(GstVideoReceiverLog) << "URI is not recognized";
+            qCWarning(GstVideoReceiverLog) << "URI is not recognized, scheme:" << sourceUrl.scheme() << "input:" << input;
         }
 
         if (!source) {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make() for data source failed";
+            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make() for data source failed, input:" << input;
             break;
         }
 
