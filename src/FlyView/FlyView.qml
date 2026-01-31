@@ -161,24 +161,12 @@ Item {
             property real bottomEdgeLeftInset: visible ? height + anchors.margins : 0
         }
 
-        // Additional Video Stream 2 - Uses modular FlyViewVideo with streamIndex=1
-        Loader {
-            id:         videoControl2Loader
-            active:     _videoStream2Enabled
-            sourceComponent: Component {
-                FlyViewVideo {
-                    pipView:     _pipView2
-                    streamIndex: 1  // Stream 2
-                }
-            }
-
-            onActiveChanged: {
-                console.log("videoControl2Loader active changed to:", active, "(_videoStream2Enabled:", _videoStream2Enabled, ")")
-            }
-
-            onLoaded: {
-                console.log("videoControl2Loader: FlyViewVideo (stream 2) LOADED")
-            }
+        // Additional Video Stream 2 - Always created, visibility controlled by settings
+        FlyViewVideo {
+            id:          videoControl2
+            pipView:     _pipView2
+            streamIndex: 1  // Stream 2
+            visible:     _videoStream2Enabled
         }
 
         PipView {
@@ -187,9 +175,9 @@ Item {
             anchors.bottom:         _pipView.visible ? _pipView.top : parent.bottom
             anchors.margins:        _toolsMargin
             item1IsFullSettingsKey: "VideoStream2IsFullWindow"
-            item1:                  videoControl2Loader.item
-            item2:                  videoControl2Loader.item
-            show:                   _videoStream2Enabled && videoControl2Loader.item && !QGroundControl.videoManager.fullScreen
+            item1:                  videoControl2
+            item2:                  videoControl2
+            show:                   _videoStream2Enabled && !QGroundControl.videoManager.fullScreen
             z:                      QGroundControl.zOrderWidgets
 
             Component.onCompleted: {
@@ -216,24 +204,12 @@ Item {
             property real bottomEdgeLeftInset: visible ? height + anchors.margins + (_pipView.visible ? _pipView.height + anchors.margins : 0) : 0
         }
 
-        // Additional Video Stream 3 - Uses modular FlyViewVideo with streamIndex=2
-        Loader {
-            id:         videoControl3Loader
-            active:     _videoStream3Enabled
-            sourceComponent: Component {
-                FlyViewVideo {
-                    pipView:     _pipView3
-                    streamIndex: 2  // Stream 3
-                }
-            }
-
-            onActiveChanged: {
-                console.log("videoControl3Loader active changed to:", active, "(_videoStream3Enabled:", _videoStream3Enabled, ")")
-            }
-
-            onLoaded: {
-                console.log("videoControl3Loader: FlyViewVideo (stream 3) LOADED")
-            }
+        // Additional Video Stream 3 - Always created, visibility controlled by settings
+        FlyViewVideo {
+            id:          videoControl3
+            pipView:     _pipView3
+            streamIndex: 2  // Stream 3
+            visible:     _videoStream3Enabled
         }
 
         PipView {
@@ -242,9 +218,9 @@ Item {
             anchors.bottom:         _pipView2.visible ? _pipView2.top : (_pipView.visible ? _pipView.top : parent.bottom)
             anchors.margins:        _toolsMargin
             item1IsFullSettingsKey: "VideoStream3IsFullWindow"
-            item1:                  videoControl3Loader.item
-            item2:                  videoControl3Loader.item
-            show:                   _videoStream3Enabled && videoControl3Loader.item && !QGroundControl.videoManager.fullScreen
+            item1:                  videoControl3
+            item2:                  videoControl3
+            show:                   _videoStream3Enabled && !QGroundControl.videoManager.fullScreen
             z:                      QGroundControl.zOrderWidgets
 
             Component.onCompleted: {
@@ -259,8 +235,16 @@ Item {
                 }
             }
 
+            onVisibleChanged: {
+                console.log("PipView3: Visible changed to:", visible, "show:", show)
+            }
+
+            onShowChanged: {
+                console.log("PipView3: Show changed to:", show, "enabled:", _videoStream3Enabled)
+            }
+
             property real leftEdgeBottomInset: visible ? width + anchors.margins : 0
-            property real bottomEdgeLeftInset: visible ? height + anchors.margins + (_pipView2.visible ? _pipView2.bottomEdgeLeftInset : (_pipView.visible ? _pipView.height + anchors.margins : 0)) : 0
+            property real bottomEdgeLeftInset: visible ? height + anchors.margins + ((_pipView2.visible ? _pipView2.height + anchors.margins : 0) + (_pipView.visible ? _pipView.height + anchors.margins : 0)) : 0
         }
 
         FlyViewWidgetLayer {

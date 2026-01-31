@@ -117,21 +117,15 @@ void VideoManager::_initAfterQmlIsReady()
 
     qCDebug(VideoManagerLog) << "_initAfterQmlIsReady";
 
-    // Initialize primary video streams
+    // Always initialize all video streams - widgets should always be created in QML
+    // The visibility is controlled by QML based on settings
     QStringList videoStreamList = {
         "videoContent",
-        "thermalVideo"
+        "thermalVideo",
+        "videoContent2",
+        "videoContent3"
     };
 
-    // Add additional streams if they are enabled and have a URL configured
-    if (_videoSettings->streamEnabled2()->rawValue().toBool() &&
-        !_videoSettings->rtspUrl2()->rawValue().toString().trimmed().isEmpty()) {
-        videoStreamList.append("videoContent2");
-    }
-    if (_videoSettings->streamEnabled3()->rawValue().toBool() &&
-        !_videoSettings->rtspUrl3()->rawValue().toString().trimmed().isEmpty()) {
-        videoStreamList.append("videoContent3");
-    }
 
     for (const QString &streamName : videoStreamList) {
         VideoReceiver *receiver = QGCCorePlugin::instance()->createVideoReceiver(this);
@@ -308,6 +302,38 @@ bool VideoManager::hasThermal() const
 bool VideoManager::hasVideo() const
 {
     return (_videoSettings->streamEnabled()->rawValue().toBool() && _videoSettings->streamConfigured());
+}
+
+bool VideoManager::isStreamDecoding(int streamIndex) const
+{
+    // Map streamIndex to receiver name
+    QString receiverName;
+    switch (streamIndex) {
+        case 0:
+            receiverName = QStringLiteral("videoContent");
+            break;
+        case 1:
+            receiverName = QStringLiteral("videoContent2");
+            break;
+        case 2:
+            receiverName = QStringLiteral("videoContent3");
+            break;
+        default:
+            qCWarning(VideoManagerLog) << "Invalid stream index:" << streamIndex;
+            return false;
+    }
+
+    // Find the receiver and check its decoding status
+    for (VideoReceiver *receiver : _videoReceivers) {
+        if (receiver->name() == receiverName) {
+            const bool isDecoding = receiver->decoding();
+            qCDebug(VideoManagerLog) << "Stream" << streamIndex << "(" << receiverName << ") decoding:" << isDecoding;
+            return isDecoding;
+        }
+    }
+
+    qCWarning(VideoManagerLog) << "Receiver not found for stream index:" << streamIndex;
+    return false;
 }
 
 bool VideoManager::isUvc() const
@@ -740,23 +766,38 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
         qCWarning(VideoManagerLog) << "Receiver already initialized";
     }
 
+    qCDebug(VideoManagerLog) << "=== Initializing receiver:" << receiver->name() << "===";
+
     QQuickItem *widget = window->findChild<QQuickItem*>(receiver->name());
     if (!widget) {
-        qCCritical(VideoManagerLog) << "stream widget not found" << receiver->name();
-    }
-    receiver->setWidget(widget);
+        qCCritical(VideoManagerLog) << "❌ Stream widget NOT FOUND:" << receiver->name();
+        qCCritical(VideoManagerLog) << "   Searching in window, available video-related widgets:";
+        QList<QQuickItem*> allItems = window->findChildren<QQuickItem*>();
+        int count = 0;
+        for (QQuickItem* item : allItems) {
+            QString name = item->objectName();
+            if (name.contains("video", Qt::CaseInsensitive) || name.contains("content", Qt::CaseInsensitive)) {
+                qCCritical(VideoManagerLog) << "     - Found:" << name << "(" << item->metaObject()->className() << ")";
+                count++;
+                if (count > 20) {
+                    qCCritical(VideoManagerLog) << "     ... (stopping after 20 items)";
+                    break;
+                }
+            }
+        }
+        // Still append the receiver so we can find it later if the widget becomes available
+    } else {
+        qCDebug(VideoManagerLog) << "✓ Widget found for" << receiver->name() << "type:" << widget->metaObject()->className();
+        receiver->setWidget(widget);
 
-    // Create the video sink if we have a widget
-    if (receiver->widget()) {
+        // Create the video sink if we have a widget
         void *sink = QGCCorePlugin::instance()->createVideoSink(receiver->widget(), receiver);
         if (!sink) {
-            qCCritical(VideoManagerLog) << "createVideoSink() failed" << receiver->name();
+            qCCritical(VideoManagerLog) << "❌ createVideoSink() FAILED for" << receiver->name();
         } else {
             receiver->setSink(sink);
-            qCDebug(VideoManagerLog) << "Video sink created for" << receiver->name();
+            qCDebug(VideoManagerLog) << "✓ Video sink created successfully for" << receiver->name();
         }
-    } else {
-        qCWarning(VideoManagerLog) << "Widget not available, cannot create sink for" << receiver->name();
     }
 
     (void) connect(receiver, &VideoReceiver::onStartComplete, this, [this, receiver](VideoReceiver::STATUS status) {
@@ -776,13 +817,7 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
         case VideoReceiver::STATUS_INVALID_STATE:
             break;
         default:
-            // Primary stream uses aggressive restart logic. For additional streams,
-            // avoid restart loops which can stall the UI on some systems if RTSP is misbehaving.
-            if (receiver->name() == QStringLiteral("videoContent2") || receiver->name() == QStringLiteral("videoContent3")) {
-                qCWarning(VideoManagerLog) << "Additional stream failed to start, not auto-restarting" << receiver->name() << receiver->uri();
-            } else {
-                _restartVideo(receiver);
-            }
+            _restartVideo(receiver);
             break;
          }
      });
@@ -793,15 +828,28 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
         if (status == VideoReceiver::STATUS_INVALID_URL) {
             qCDebug(VideoManagerLog) << "Invalid video URL. Not restarting";
         } else {
-            // Don't auto-restart additional streams to avoid infinite loops on failure
+            // Check if this is an additional stream
             const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") ||
                                              receiver->name() == QStringLiteral("videoContent3"));
-            if (isAdditionalStream) {
-                qCDebug(VideoManagerLog) << "Additional stream stopped, not auto-restarting" << receiver->name();
+
+            // Only restart if URL is not empty (stream is enabled)
+            if (receiver->uri().isEmpty()) {
+                qCDebug(VideoManagerLog) << "No URI configured, not restarting" << receiver->name();
+            } else if (isAdditionalStream) {
+                // Additional streams: restart with a delay
+                QTimer::singleShot(2000, receiver, [this, receiver]() {
+                    if (!receiver->uri().isEmpty()) {
+                        qCDebug(VideoManagerLog) << "Restarting additional video stream" << receiver->name() << receiver->uri();
+                        _startReceiver(receiver);
+                    }
+                });
             } else {
+                // Primary stream: restart quickly
                 QTimer::singleShot(1000, receiver, [this, receiver]() {
-                    qCDebug(VideoManagerLog) << "Restarting video receiver" << receiver->name() << receiver->uri();
-                    _startReceiver(receiver);
+                    if (!receiver->uri().isEmpty()) {
+                        qCDebug(VideoManagerLog) << "Restarting video receiver" << receiver->name() << receiver->uri();
+                        _startReceiver(receiver);
+                    }
                 });
             }
         }
@@ -868,24 +916,24 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
 
     _videoReceivers.append(receiver);
 
-    if (hasVideo()) {
-        const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") || receiver->name() == QStringLiteral("videoContent3"));
+    // Only start the receiver if:
+    // 1. We have video configured (hasVideo or it's an additional stream with a URL)
+    // 2. The widget and sink are ready
+    const bool isAdditionalStream = (receiver->name() == QStringLiteral("videoContent2") ||
+                                     receiver->name() == QStringLiteral("videoContent3"));
+    const bool hasValidUri = !receiver->uri().isEmpty();
+    const bool hasWidgetAndSink = (receiver->widget() && receiver->sink());
 
-        // Additional streams need their widget/sink which may not exist yet at startup.
-        // We only start them if they have a valid widget and sink.
-        if (isAdditionalStream) {
-            if (receiver->widget() && receiver->sink()) {
-                _startReceiver(receiver);
-            } else {
-                qCDebug(VideoManagerLog) << "Additional stream widget/sink not ready yet, will start when available" << receiver->name();
-            }
+    if (hasValidUri && hasWidgetAndSink) {
+        if (isAdditionalStream || hasVideo()) {
+            qCDebug(VideoManagerLog) << "Starting receiver" << receiver->name() << "URI:" << receiver->uri();
+            _startReceiver(receiver);
         } else {
-            if (receiver->widget() && receiver->sink()) {
-                _startReceiver(receiver);
-            } else {
-                qCWarning(VideoManagerLog) << "Primary stream missing widget/sink, not starting" << receiver->name();
-            }
+            qCDebug(VideoManagerLog) << "Receiver" << receiver->name() << "not starting: hasVideo=" << hasVideo();
         }
+    } else {
+        qCDebug(VideoManagerLog) << "Receiver" << receiver->name() << "not starting: hasValidUri=" << hasValidUri
+                                << "hasWidgetAndSink=" << hasWidgetAndSink;
     }
 }
 

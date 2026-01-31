@@ -25,6 +25,9 @@ public:
     QString name() const { return _name; }
     QString uri() const { return _uri; }
     bool started() const { return _started; }
+    bool decoding() const { return _decoding; }
+    bool recording() const { return _recording; }
+    bool streaming() const { return _streaming; }
     bool lowLatency() const { return _lowLatency; }
     QGCVideoStreamInfo *videoStreamInfo() { return _videoStreamInfo; }
     QString recordingOutput() const { return _recordingOutput; }

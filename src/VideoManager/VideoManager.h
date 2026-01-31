@@ -55,6 +55,7 @@ public:
     Q_INVOKABLE void startVideo();
     Q_INVOKABLE void stopRecording();
     Q_INVOKABLE void stopVideo();
+    Q_INVOKABLE bool isStreamDecoding(int streamIndex) const;
 
     void init(QQuickWindow *mainWindow);
     void cleanup();

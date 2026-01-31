@@ -31,12 +31,17 @@ Item {
     property bool   _streamConfigured:  _streamEnabled && _streamUrl.length > 0
     property string _streamLabel:       streamIndex === 0 ? qsTr("VIDEO") : qsTr("STREAM %1").arg(streamIndex + 1)
 
-    // For all streams, use VideoManager's decoding state for primary stream
-    // For additional streams, we don't have per-stream decoding tracking yet,
-    // so show the waiting image (visible: !_isDecoding) until we implement that
-    // For now, additional streams will show video background when configured (black until video arrives)
-    // but the noVideo image visibility is controlled separately below
-    property bool   _isDecoding:        streamIndex === 0 ? QGroundControl.videoManager.decoding : false
+    // Per-stream decoding status tracking
+    property bool   _isDecoding:        QGroundControl.videoManager.isStreamDecoding(streamIndex)
+
+    Component.onCompleted: {
+        console.log("FlightDisplayViewVideo initialized:")
+        console.log("  - streamIndex:", streamIndex)
+        console.log("  - videoContentName:", videoContentName)
+        console.log("  - _streamEnabled:", _streamEnabled)
+        console.log("  - _streamUrl:", _streamUrl)
+        console.log("  - _streamConfigured:", _streamConfigured)
+    }
 
     // ========== Common Properties ==========
     property bool useSmallFont: true
