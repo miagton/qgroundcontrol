@@ -712,14 +712,14 @@ void VideoManager::_restartAllVideos()
         }
     }
 
-    // Restart additional streams with delays to avoid GL context race conditions
+    // Restart additional streams with short delays to avoid GL context race conditions
     for (VideoReceiver *videoReceiver : std::as_const(_videoReceivers)) {
         if (videoReceiver->name() == QStringLiteral("videoContent2")) {
-            QTimer::singleShot(3000, videoReceiver, [this, videoReceiver]() {
+            QTimer::singleShot(1000, videoReceiver, [this, videoReceiver]() {
                 _restartVideo(videoReceiver);
             });
         } else if (videoReceiver->name() == QStringLiteral("videoContent3")) {
-            QTimer::singleShot(5000, videoReceiver, [this, videoReceiver]() {
+            QTimer::singleShot(2000, videoReceiver, [this, videoReceiver]() {
                 _restartVideo(videoReceiver);
             });
         }
@@ -971,8 +971,7 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
     if (hasValidUri && hasWidgetAndSink) {
         if (isAdditionalStream) {
             // Delay starting additional streams to avoid GL context race conditions
-            // The primary stream needs time to establish its GL context first
-            int delayMs = (receiver->name() == QStringLiteral("videoContent2")) ? 3000 : 5000;
+            int delayMs = (receiver->name() == QStringLiteral("videoContent2")) ? 1000 : 2000;
             qCDebug(VideoManagerLog) << "Scheduling receiver" << receiver->name() << "to start in" << delayMs << "ms";
             QTimer::singleShot(delayMs, receiver, [this, receiver]() {
                 if (receiver && !receiver->uri().isEmpty() && receiver->widget() && receiver->sink()) {
@@ -1183,8 +1182,7 @@ void VideoManager::registerVideoWidget(const QString &name, QQuickItem *widget)
     if (hasValidUri && receiver->widget() && receiver->sink()) {
         if (isAdditionalStream) {
             // Delay starting additional streams to avoid GL context race conditions
-            // The primary stream needs time to establish its GL context first
-            int delayMs = (name == QStringLiteral("videoContent2")) ? 3000 : 5000;
+            int delayMs = (name == QStringLiteral("videoContent2")) ? 1000 : 2000;
             qCDebug(VideoManagerLog) << "Scheduling receiver" << name << "to start in" << delayMs << "ms, URI:" << receiver->uri();
             QTimer::singleShot(delayMs, receiver, [this, receiver]() {
                 if (receiver && !receiver->uri().isEmpty() && receiver->widget() && receiver->sink()) {

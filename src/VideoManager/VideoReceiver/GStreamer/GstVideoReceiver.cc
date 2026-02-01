@@ -657,10 +657,37 @@ GstElement *GstVideoReceiver::_makeSource(const QString &input)
                 break;
             }
 
+            // Check if this is RTSPT (RTSP over TCP)
+            const bool isTcpTransport = sourceUrl.scheme().compare("rtspt", Qt::CaseInsensitive) == 0;
+
+            // Optimized settings for low latency while keeping TCP reliability
+            // latency: 0 for minimum latency (TCP handles reliability)
+            // drop-on-latency: TRUE to prevent frame buildup and lag
+            // ntp-sync: FALSE to avoid clock sync delays
             g_object_set(source,
                          "location", input.toUtf8().constData(),
-                         "latency", 25,
+                         "latency", 50,                    // Minimum latency - TCP handles reliability
+                         "buffer-mode", 1,                // Slave mode - sync to sender
+                         "drop-on-latency", TRUE,         // Drop late frames to prevent lag buildup
+                         "do-retransmission", FALSE,      // Disable for TCP (not needed, adds latency)
+                         "ntp-sync", FALSE,               // Disable NTP sync for lower latency
+                         "timeout", (guint64)5000000,     // 5 second connection timeout (microseconds)
+                         "tcp-timeout", (guint64)5000000, // 5 second TCP timeout (microseconds)
                          nullptr);
+
+            // Always use TCP - more reliable for video transfer, fallback to UDP if unavailable
+            if (isTcpTransport) {
+                g_object_set(source,
+                             "protocols", 0x04,  // GST_RTSP_LOWER_TRANS_TCP only
+                             nullptr);
+                qCDebug(GstVideoReceiverLog) << "Using TCP transport for RTSPT stream";
+            } else {
+                // For regular RTSP, try TCP first, fallback to UDP
+                g_object_set(source,
+                             "protocols", 0x07,  // TCP | UDP | UDP_MCAST - try all, TCP preferred
+                             nullptr);
+                qCDebug(GstVideoReceiverLog) << "Using TCP (preferred) with UDP fallback for RTSP stream";
+            }
         } else if (isTcpMPEGTS) {
             source = gst_element_factory_make("tcpclientsrc", "source");
             if (!source) {
@@ -1350,8 +1377,46 @@ void GstVideoReceiver::_linkPad(GstElement *element, GstPad *pad, gpointer data)
         return;
     }
 
+    // Check pad caps to determine if this is a video stream
+    // RTSP sources create multiple pads (video, audio, etc.) - we only want video
+    GstCaps *caps = gst_pad_query_caps(pad, nullptr);
+    bool isVideoPad = false;
+
+    if (caps && !gst_caps_is_any(caps) && !gst_caps_is_empty(caps)) {
+        for (guint i = 0; i < gst_caps_get_size(caps); i++) {
+            const GstStructure *s = gst_caps_get_structure(caps, i);
+            const gchar *media = gst_structure_get_string(s, "media");
+            const gchar *encoding = gst_structure_get_string(s, "encoding-name");
+
+            if (media && g_strcmp0(media, "video") == 0) {
+                isVideoPad = true;
+                break;
+            }
+            // Check for video encoding names if media field is not present
+            if (encoding) {
+                if (g_str_has_prefix(encoding, "H264") || g_str_has_prefix(encoding, "H265") ||
+                    g_str_has_prefix(encoding, "VP8") || g_str_has_prefix(encoding, "VP9") ||
+                    g_str_has_prefix(encoding, "JPEG") || g_str_has_prefix(encoding, "MP4V")) {
+                    isVideoPad = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    gst_clear_caps(&caps);
+
+    if (!isVideoPad) {
+        // This is likely an audio pad - skip it silently
+        qCDebug(GstVideoReceiverLog) << "Skipping non-video pad:" << name;
+        g_clear_pointer(&name, g_free);
+        return;
+    }
+
+    qCDebug(GstVideoReceiverLog) << "Linking video pad:" << name;
+
     if (!gst_element_link_pads(element, name, GST_ELEMENT(data), "sink")) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_link_pads() failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_link_pads() failed for pad:" << name;
     }
 
     g_clear_pointer(&name, g_free);
