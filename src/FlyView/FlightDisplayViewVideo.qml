@@ -31,8 +31,16 @@ Item {
     property bool   _streamConfigured:  _streamEnabled && _streamUrl.length > 0
     property string _streamLabel:       streamIndex === 0 ? qsTr("VIDEO") : qsTr("STREAM %1").arg(streamIndex + 1)
 
-    // Per-stream decoding status tracking
-    property bool   _isDecoding:        QGroundControl.videoManager.isStreamDecoding(streamIndex)
+    // Per-stream decoding status tracking - updated when any decoding state changes
+    property bool   _isDecoding:        false
+
+    // Update decoding state when VideoManager signals any decoding change
+    Connections {
+        target: QGroundControl.videoManager
+        function onDecodingChanged() {
+            root._isDecoding = QGroundControl.videoManager.isStreamDecoding(root.streamIndex)
+        }
+    }
 
     Component.onCompleted: {
         console.log("FlightDisplayViewVideo initialized:")
@@ -41,6 +49,28 @@ Item {
         console.log("  - _streamEnabled:", _streamEnabled)
         console.log("  - _streamUrl:", _streamUrl)
         console.log("  - _streamConfigured:", _streamConfigured)
+
+        // Initial check for decoding state
+        root._isDecoding = QGroundControl.videoManager.isStreamDecoding(root.streamIndex)
+
+        // Register the video widget with VideoManager
+        // This ensures the widget is available even if VideoManager's init runs before QML is fully loaded
+        registerVideoContentTimer.start()
+    }
+
+    // Timer to delay registration slightly to ensure the videoContent item is fully created
+    Timer {
+        id: registerVideoContentTimer
+        interval: 100
+        repeat: false
+        onTriggered: {
+            if (videoContent) {
+                console.log("Registering video widget:", root.videoContentName)
+                QGroundControl.videoManager.registerVideoWidget(root.videoContentName, videoContent)
+            } else {
+                console.error("Cannot register video widget - videoContent is null")
+            }
+        }
     }
 
     // ========== Common Properties ==========

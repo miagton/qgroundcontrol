@@ -8,6 +8,7 @@
 
 Q_DECLARE_LOGGING_CATEGORY(VideoManagerLog)
 
+class QQuickItem;
 class QQuickWindow;
 class FinishVideoInitialization;
 class SubtitleWriter;
@@ -56,6 +57,7 @@ public:
     Q_INVOKABLE void stopRecording();
     Q_INVOKABLE void stopVideo();
     Q_INVOKABLE bool isStreamDecoding(int streamIndex) const;
+    Q_INVOKABLE void registerVideoWidget(const QString &name, QQuickItem *widget);
 
     void init(QQuickWindow *mainWindow);
     void cleanup();
