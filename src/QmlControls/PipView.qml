@@ -59,11 +59,11 @@ Item {
             _fullItem = item1IsFull ? item1 : item2
             _pipOrWindowItem = item1IsFull ? item2 : item1
         } else {
-            // Only item1 present (or item1 === item2)
+            // Single-item view (item1 === item2): can toggle pip/full/window
             // Start in pip mode by default
             item1.pipState.state = item1.pipState.pipState
             _fullItem = item1
-            _pipOrWindowItem = null
+            _pipOrWindowItem = item1  // Set to item1 so windowed mode works
         }
         _setPipIsExpanded(QGroundControl.loadBoolGlobalSetting(_pipExpandedSettingsKey, true))
     }
