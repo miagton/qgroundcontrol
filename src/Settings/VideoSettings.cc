@@ -84,6 +84,12 @@ DECLARE_SETTINGSFACT(VideoSettings, streamName2)
 DECLARE_SETTINGSFACT(VideoSettings, rtspUrl3)
 DECLARE_SETTINGSFACT(VideoSettings, streamEnabled3)
 DECLARE_SETTINGSFACT(VideoSettings, streamName3)
+DECLARE_SETTINGSFACT(VideoSettings, rtspUrlSecondary)
+DECLARE_SETTINGSFACT(VideoSettings, rtspUrl2Secondary)
+DECLARE_SETTINGSFACT(VideoSettings, rtspUrl3Secondary)
+DECLARE_SETTINGSFACT(VideoSettings, usingPrimaryUrl)
+DECLARE_SETTINGSFACT(VideoSettings, usingPrimaryUrl2)
+DECLARE_SETTINGSFACT(VideoSettings, usingPrimaryUrl3)
 
 DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, videoSource)
 {

@@ -94,6 +94,11 @@ void VideoManager::init(QQuickWindow *mainWindow)
     (void) connect(_videoSettings->streamEnabled3(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->rtspUrl3(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
 
+    // HD/SD toggle flags - use QueuedConnection to avoid blocking during video restart
+    (void) connect(_videoSettings->usingPrimaryUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged, Qt::QueuedConnection);
+    (void) connect(_videoSettings->usingPrimaryUrl2(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged, Qt::QueuedConnection);
+    (void) connect(_videoSettings->usingPrimaryUrl3(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged, Qt::QueuedConnection);
+
     (void) connect(MultiVehicleManager::instance(), &MultiVehicleManager::activeVehicleChanged, this, &VideoManager::_setActiveVehicle);
 
     (void) connect(this, &VideoManager::autoStreamConfiguredChanged, this, &VideoManager::_videoSourceChanged);
@@ -394,6 +399,11 @@ bool VideoManager::isStreamSource() const
 
 void VideoManager::_videoSourceChanged()
 {
+    qCWarning(VideoManagerLog) << "*** _videoSourceChanged() called - will update all video receivers ***";
+    qCWarning(VideoManagerLog) << "*** IMMEDIATE READ: usingPrimaryUrl =" << _videoSettings->usingPrimaryUrl()->rawValue().toBool();
+    qCWarning(VideoManagerLog) << "*** IMMEDIATE READ: usingPrimaryUrl2 =" << _videoSettings->usingPrimaryUrl2()->rawValue().toBool();
+    qCWarning(VideoManagerLog) << "*** IMMEDIATE READ: usingPrimaryUrl3 =" << _videoSettings->usingPrimaryUrl3()->rawValue().toBool();
+
     bool changed = false;
     if (_activeVehicle) {
         QGCCameraManager* camMgr = _activeVehicle->cameraManager();
@@ -421,7 +431,14 @@ void VideoManager::_videoSourceChanged()
         emit isAutoStreamChanged();
 
         if (hasVideo()) {
-            _restartAllVideos();
+            qCWarning(VideoManagerLog) << "*** Fast restart for quality change ***";
+            // Fast restart - just stop and immediately restart without long delays
+            stopVideo();
+            // Use short delay to let stop complete, then restart
+            QTimer::singleShot(200, this, [this]() {
+                qCWarning(VideoManagerLog) << "*** Starting video with new quality ***";
+                startVideo();
+            });
         } else {
             stopVideo();
         }
@@ -576,15 +593,27 @@ bool VideoManager::_updateSettings(VideoReceiver *receiver)
     // Handle additional video streams (videoContent2 and videoContent3)
     if (receiver->name() == "videoContent2") {
         const bool enabled = _videoSettings->streamEnabled2()->rawValue().toBool();
-        const QString rtspUrl2 = _videoSettings->rtspUrl2()->rawValue().toString().trimmed();
-        qCDebug(VideoManagerLog) << "Configuring videoContent2: enabled=" << enabled << "url=" << rtspUrl2;
+        const bool usingPrimary = _videoSettings->usingPrimaryUrl2()->rawValue().toBool();
+        const QString primaryUrl = _videoSettings->rtspUrl2()->rawValue().toString().trimmed();
+        const QString secondaryUrl = _videoSettings->rtspUrl2Secondary()->rawValue().toString().trimmed();
+
+        // Select URL based on flag
+        const QString urlToUse = usingPrimary ? primaryUrl : secondaryUrl;
+
+        qCWarning(VideoManagerLog) << "=== STREAM 2 URL SELECTION ===";
+        qCWarning(VideoManagerLog) << "  Enabled:" << enabled;
+        qCWarning(VideoManagerLog) << "  usingPrimary flag:" << usingPrimary;
+        qCWarning(VideoManagerLog) << "  Primary URL (HD):" << primaryUrl;
+        qCWarning(VideoManagerLog) << "  Secondary URL (SD):" << secondaryUrl;
+        qCWarning(VideoManagerLog) << "  >> SELECTED URL:" << urlToUse;
+        qCWarning(VideoManagerLog) << "  >> Using:" << (usingPrimary ? "PRIMARY/HD" : "SECONDARY/SD");
 
         // Validate URL before using it
-        if (enabled && !rtspUrl2.isEmpty() &&
-            (rtspUrl2.startsWith("rtsp://", Qt::CaseInsensitive) ||
-             rtspUrl2.startsWith("rtspt://", Qt::CaseInsensitive) ||
-             rtspUrl2.startsWith("rtsps://", Qt::CaseInsensitive))) {
-            settingsChanged |= _updateVideoUri(receiver, rtspUrl2);
+        if (enabled && !urlToUse.isEmpty() &&
+            (urlToUse.startsWith("rtsp://", Qt::CaseInsensitive) ||
+             urlToUse.startsWith("rtspt://", Qt::CaseInsensitive) ||
+             urlToUse.startsWith("rtsps://", Qt::CaseInsensitive))) {
+            settingsChanged |= _updateVideoUri(receiver, urlToUse);
         } else {
             settingsChanged |= _updateVideoUri(receiver, QString());
         }
@@ -593,15 +622,27 @@ bool VideoManager::_updateSettings(VideoReceiver *receiver)
 
     if (receiver->name() == "videoContent3") {
         const bool enabled = _videoSettings->streamEnabled3()->rawValue().toBool();
-        const QString rtspUrl3 = _videoSettings->rtspUrl3()->rawValue().toString().trimmed();
-        qCDebug(VideoManagerLog) << "Configuring videoContent3: enabled=" << enabled << "url=" << rtspUrl3;
+        const bool usingPrimary = _videoSettings->usingPrimaryUrl3()->rawValue().toBool();
+        const QString primaryUrl = _videoSettings->rtspUrl3()->rawValue().toString().trimmed();
+        const QString secondaryUrl = _videoSettings->rtspUrl3Secondary()->rawValue().toString().trimmed();
+
+        // Select URL based on flag
+        const QString urlToUse = usingPrimary ? primaryUrl : secondaryUrl;
+
+        qCWarning(VideoManagerLog) << "=== STREAM 3 URL SELECTION ===";
+        qCWarning(VideoManagerLog) << "  Enabled:" << enabled;
+        qCWarning(VideoManagerLog) << "  usingPrimary flag:" << usingPrimary;
+        qCWarning(VideoManagerLog) << "  Primary URL (HD):" << primaryUrl;
+        qCWarning(VideoManagerLog) << "  Secondary URL (SD):" << secondaryUrl;
+        qCWarning(VideoManagerLog) << "  >> SELECTED URL:" << urlToUse;
+        qCWarning(VideoManagerLog) << "  >> Using:" << (usingPrimary ? "PRIMARY/HD" : "SECONDARY/SD");
 
         // Validate URL before using it
-        if (enabled && !rtspUrl3.isEmpty() &&
-            (rtspUrl3.startsWith("rtsp://", Qt::CaseInsensitive) ||
-             rtspUrl3.startsWith("rtspt://", Qt::CaseInsensitive) ||
-             rtspUrl3.startsWith("rtsps://", Qt::CaseInsensitive))) {
-            settingsChanged |= _updateVideoUri(receiver, rtspUrl3);
+        if (enabled && !urlToUse.isEmpty() &&
+            (urlToUse.startsWith("rtsp://", Qt::CaseInsensitive) ||
+             urlToUse.startsWith("rtspt://", Qt::CaseInsensitive) ||
+             urlToUse.startsWith("rtsps://", Qt::CaseInsensitive))) {
+            settingsChanged |= _updateVideoUri(receiver, urlToUse);
         } else {
             settingsChanged |= _updateVideoUri(receiver, QString());
         }
@@ -620,7 +661,20 @@ bool VideoManager::_updateSettings(VideoReceiver *receiver)
     } else if (source == VideoSettings::videoSourceMPEGTS) {
         settingsChanged |= _updateVideoUri(receiver, QStringLiteral("mpegts://%1").arg(_videoSettings->udpUrl()->rawValue().toString()));
     } else if (source == VideoSettings::videoSourceRTSP) {
-        settingsChanged |= _updateVideoUri(receiver, _videoSettings->rtspUrl()->rawValue().toString());
+        // Check if we should use primary or secondary URL
+        const bool usingPrimary = _videoSettings->usingPrimaryUrl()->rawValue().toBool();
+        const QString primaryUrl = _videoSettings->rtspUrl()->rawValue().toString();
+        const QString secondaryUrl = _videoSettings->rtspUrlSecondary()->rawValue().toString();
+        const QString urlToUse = usingPrimary ? primaryUrl : secondaryUrl;
+
+        qCWarning(VideoManagerLog) << "=== MAIN STREAM URL SELECTION ===";
+        qCWarning(VideoManagerLog) << "  usingPrimary flag:" << usingPrimary;
+        qCWarning(VideoManagerLog) << "  Primary URL (HD):" << primaryUrl;
+        qCWarning(VideoManagerLog) << "  Secondary URL (SD):" << secondaryUrl;
+        qCWarning(VideoManagerLog) << "  >> SELECTED URL:" << urlToUse;
+        qCWarning(VideoManagerLog) << "  >> Using:" << (usingPrimary ? "PRIMARY/HD" : "SECONDARY/SD");
+
+        settingsChanged |= _updateVideoUri(receiver, urlToUse);
     } else if (source == VideoSettings::videoSourceTCP) {
         settingsChanged |= _updateVideoUri(receiver, QStringLiteral("tcp://%1").arg(_videoSettings->tcpUrl()->rawValue().toString()));
     } else if (source == VideoSettings::videoSource3DRSolo) {

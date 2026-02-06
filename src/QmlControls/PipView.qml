@@ -15,6 +15,7 @@ Item {
     property var    item2:                  null    // Optional, may come and go
     property string item1IsFullSettingsKey          // Settings key to save whether item1 was saved in full mode
     property bool   show:                   true
+    property var    clickExclusionItem:     null    // Item to exclude from click handling (e.g., buttons)
 
     readonly property string _pipExpandedSettingsKey: "IsPIPVisible"
 
@@ -130,7 +131,24 @@ Item {
         enabled:        _isExpanded
         preventStealing: true
         hoverEnabled:   true
-        onClicked:      _swapPip()
+        onClicked:      (mouse) => {
+            // Check if click is within exclusion item bounds
+            if (clickExclusionItem && clickExclusionItem.visible) {
+                var mappedPoint = mapToItem(clickExclusionItem.parent, mouse.x, mouse.y)
+                var inX = mappedPoint.x >= clickExclusionItem.x && mappedPoint.x <= (clickExclusionItem.x + clickExclusionItem.width)
+                var inY = mappedPoint.y >= clickExclusionItem.y && mappedPoint.y <= (clickExclusionItem.y + clickExclusionItem.height)
+                if (inX && inY) {
+                    console.log("PipView: Click in exclusion zone, triggering button action")
+                    mouse.accepted = true  // Accept and handle it ourselves
+                    // Trigger the parent item's toggle function
+                    if (item1 && typeof item1.toggleStreamQuality === "function") {
+                        item1.toggleStreamQuality()
+                    }
+                    return
+                }
+            }
+            _swapPip()
+        }
     }
 
     // MouseArea to drag in order to resize the PiP area

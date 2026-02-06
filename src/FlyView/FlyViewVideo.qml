@@ -10,6 +10,8 @@ Item {
     property int    streamIndex:    0   // 0 = primary, 1 = stream2, 2 = stream3
     property Item   pipView
     property Item   pipState:       videoPipState
+    property alias  hdsdButton:     qualityButtonBackground2  // Expose button for PipView exclusion
+    property bool   _isTogglingQuality: false  // Track if quality toggle is in progress
 
     // Only primary stream controls VideoManager start/stop
     property bool   _isPrimaryStream: streamIndex === 0
@@ -109,6 +111,7 @@ Item {
         anchors.fill:               parent
         enabled:                    pipState.state === pipState.fullState
         hoverEnabled:               true
+        propagateComposedEvents:    true  // Allow child MouseAreas to handle events first
 
         property double x0:         0
         property double x1:         0
@@ -120,8 +123,13 @@ Item {
         property var trackingROI:   null
         property var trackingStatus: _isPrimaryStream ? trackingStatusComponent.createObject(flyViewVideoMouseArea, {}) : null
 
-        onClicked:       { if (_isPrimaryStream) onScreenGimbalController.clickControl() }
-        onDoubleClicked: { if (_isPrimaryStream) QGroundControl.videoManager.fullScreen = !QGroundControl.videoManager.fullScreen }
+        onClicked: (mouse) => {
+            if (_isPrimaryStream) onScreenGimbalController.clickControl()
+        }
+
+        onDoubleClicked: (mouse) => {
+            if (_isPrimaryStream) QGroundControl.videoManager.fullScreen = !QGroundControl.videoManager.fullScreen
+        }
 
         onPressed:(mouse) => {
             if (!_isPrimaryStream) return
@@ -271,5 +279,132 @@ Item {
         id: obstacleDistance
         visible: _isPrimaryStream
         showText: pipState.state === pipState.fullState
+    }
+
+    // HD/SD quality toggle button - MUST BE LAST to be on top of everything
+    // Using Item wrapper to isolate from parent MouseArea
+    Item {
+        anchors.fill: parent
+        z: 10000  // Maximum z-order
+
+        Rectangle {
+            id:                 qualityButtonBackground2
+            anchors.bottom:     parent.bottom
+            anchors.bottomMargin: ScreenTools.defaultFontPixelHeight
+            anchors.right:      parent.right
+            anchors.rightMargin: ScreenTools.defaultFontPixelHeight
+            width:              qualityButtonLabel2.contentWidth + (ScreenTools.defaultFontPixelHeight * 1.5)
+            height:             qualityButtonLabel2.contentHeight + (ScreenTools.defaultFontPixelHeight)
+            radius:             height / 2
+            border.width:       2
+            border.color:       "white"
+            color:              _root._isTogglingQuality ? "#9E9E9E" : (qualityButtonMouseArea2.pressed ? "#FF9800" : (qualityButtonMouseArea2.containsMouse ? "#4CAF50" : "#2196F3"))
+            opacity:            _root._isTogglingQuality ? 0.5 : 0.9
+            visible:            videoStreaming._hasSecondaryUrl
+
+            QGCLabel {
+                id:                 qualityButtonLabel2
+                text:               _root._isTogglingQuality ? "..." : (videoStreaming._useSecondaryUrl ? "SD" : "HD")
+                font.bold:          true
+                color:              "white"
+                font.pointSize:     ScreenTools.largeFontPointSize
+                anchors.centerIn:   parent
+            }
+
+            MouseArea {
+                id:                 qualityButtonMouseArea2
+                anchors.fill:       parent
+                enabled:            !_root._isTogglingQuality
+                hoverEnabled:       true
+                cursorShape:        _root._isTogglingQuality ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                propagateComposedEvents: false
+                preventStealing:    true
+
+                onPressed: (mouse) => {
+                    mouse.accepted = true
+                    console.log("!!! HD/SD button PRESSED !!!")
+                }
+
+                onReleased: (mouse) => {
+                    mouse.accepted = true
+                    console.log("!!! HD/SD button RELEASED !!!")
+                    // Trigger toggle on release to ensure it fires
+                    _root.toggleStreamQuality()
+                }
+
+                onClicked: (mouse) => {
+                    mouse.accepted = true
+                    console.log("!!! HD/SD button CLICKED !!!")
+                }
+
+                onDoubleClicked: (mouse) => {
+                    mouse.accepted = true
+                    console.log("!!! HD/SD button DOUBLE-CLICKED (ignoring) !!!")
+                }
+
+                onPressedChanged: {
+                    console.log("!!! HD/SD button pressedChanged:", pressed)
+                }
+            }
+        }
+    }
+
+    // Timer to re-enable button after quality toggle
+    Timer {
+        id: qualityToggleCooldown
+        interval: 3000  // 3 seconds - optimized for fast quality switching
+        running: false
+        repeat: false
+        onTriggered: {
+            console.log("*** Quality toggle cooldown complete - button re-enabled ***")
+            _root._isTogglingQuality = false
+        }
+    }
+
+    // Function to toggle between HD and SD streams
+    function toggleStreamQuality() {
+        if (!videoStreaming._hasSecondaryUrl) return
+        if (_root._isTogglingQuality) {
+            console.log("*** Quality toggle already in progress - ignoring click ***")
+            return
+        }
+
+        console.log("=== HD/SD Toggle Clicked ===")
+        console.log("Stream Index:", _root.streamIndex)
+        console.log("Current _useSecondaryUrl:", videoStreaming._useSecondaryUrl)
+
+        // Set toggling flag and start cooldown
+        _root._isTogglingQuality = true
+        qualityToggleCooldown.restart()
+
+        // Get the current usingPrimaryUrl value and invert it
+        var currentUsingPrimary = true
+        if (_root.streamIndex === 0) {
+            currentUsingPrimary = QGroundControl.settingsManager.videoSettings.usingPrimaryUrl.value
+            console.log("Stream 0 - currentUsingPrimary:", currentUsingPrimary)
+            // Use .value instead of .rawValue to ensure proper signal emission
+            QGroundControl.settingsManager.videoSettings.usingPrimaryUrl.value = !currentUsingPrimary
+            console.log("Stream 0 - NEW usingPrimaryUrl:", !currentUsingPrimary)
+            console.log("Stream 0 - VERIFY read back (.value):", QGroundControl.settingsManager.videoSettings.usingPrimaryUrl.value)
+            console.log("Stream 0 - VERIFY read back (.rawValue):", QGroundControl.settingsManager.videoSettings.usingPrimaryUrl.rawValue)
+        } else if (_root.streamIndex === 1) {
+            currentUsingPrimary = QGroundControl.settingsManager.videoSettings.usingPrimaryUrl2.value
+            console.log("Stream 1 - currentUsingPrimary:", currentUsingPrimary)
+            QGroundControl.settingsManager.videoSettings.usingPrimaryUrl2.value = !currentUsingPrimary
+            console.log("Stream 1 - NEW usingPrimaryUrl2:", !currentUsingPrimary)
+            console.log("Stream 1 - VERIFY read back (.value):", QGroundControl.settingsManager.videoSettings.usingPrimaryUrl2.value)
+            console.log("Stream 1 - VERIFY read back (.rawValue):", QGroundControl.settingsManager.videoSettings.usingPrimaryUrl2.rawValue)
+        } else if (_root.streamIndex === 2) {
+            currentUsingPrimary = QGroundControl.settingsManager.videoSettings.usingPrimaryUrl3.value
+            console.log("Stream 2 - currentUsingPrimary:", currentUsingPrimary)
+            QGroundControl.settingsManager.videoSettings.usingPrimaryUrl3.value = !currentUsingPrimary
+            console.log("Stream 2 - NEW usingPrimaryUrl3:", !currentUsingPrimary)
+            console.log("Stream 2 - VERIFY read back (.value):", QGroundControl.settingsManager.videoSettings.usingPrimaryUrl3.value)
+            console.log("Stream 2 - VERIFY read back (.rawValue):", QGroundControl.settingsManager.videoSettings.usingPrimaryUrl3.rawValue)
+        }
+
+        console.log("New state will be:", currentUsingPrimary ? "SD" : "HD")
+        console.log(">>> Settings changed - _videoSourceChanged signal should fire automatically")
+        console.log(">>> Button disabled for 3 seconds to prevent rapid toggling")
     }
 }

@@ -227,6 +227,7 @@ Item {
             item1IsFullSettingsKey: "MainVideoIsFullWindow"
             item1:                  videoControl
             item2:                  videoControl  // Single-item pip view (toggle pip/full)
+            clickExclusionItem:     videoControl.hdsdButton  // Exclude HD/SD button from click handling
             // Show when: has video, not in fullScreen mode, and in pip state
             show:                   QGroundControl.videoManager.hasVideo && !QGroundControl.videoManager.fullScreen &&
                                     videoControl.pipState.state === videoControl.pipState.pipState
@@ -262,6 +263,7 @@ Item {
             item1IsFullSettingsKey: "VideoStream2IsFullWindow"
             item1:                  videoControl2
             item2:                  videoControl2  // Same item for single-item pip view (toggle pip/full)
+            clickExclusionItem:     videoControl2.hdsdButton  // Exclude HD/SD button from click handling
             // Show when: stream is enabled AND not in VideoManager fullScreen mode AND in pip state
             // Hide when in full state (content fills screen via PipState reparenting)
             show:                   _videoStream2Enabled && !QGroundControl.videoManager.fullScreen &&
@@ -300,6 +302,7 @@ Item {
             item1IsFullSettingsKey: "VideoStream3IsFullWindow"
             item1:                  videoControl3
             item2:                  videoControl3  // Same item for single-item pip view (toggle pip/full)
+            clickExclusionItem:     videoControl3.hdsdButton  // Exclude HD/SD button from click handling
             // Show when: stream is enabled AND not in VideoManager fullScreen mode AND in pip state
             // Hide when in full state (content fills screen via PipState reparenting)
             show:                   _videoStream3Enabled && !QGroundControl.videoManager.fullScreen &&

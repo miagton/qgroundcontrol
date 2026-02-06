@@ -38,6 +38,12 @@ public:
     DEFINE_SETTINGFACT(streamEnabled3)
     DEFINE_SETTINGFACT(streamName2)
     DEFINE_SETTINGFACT(streamName3)
+    DEFINE_SETTINGFACT(rtspUrlSecondary)
+    DEFINE_SETTINGFACT(rtspUrl2Secondary)
+    DEFINE_SETTINGFACT(rtspUrl3Secondary)
+    DEFINE_SETTINGFACT(usingPrimaryUrl)
+    DEFINE_SETTINGFACT(usingPrimaryUrl2)
+    DEFINE_SETTINGFACT(usingPrimaryUrl3)
 
     Q_PROPERTY(bool     streamConfigured        READ streamConfigured       NOTIFY streamConfiguredChanged)
     Q_PROPERTY(QString  rtspVideoSource         READ rtspVideoSource        CONSTANT)

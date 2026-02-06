@@ -15,6 +15,14 @@ Item {
     property int    streamIndex:        0
     property string videoContentName:   streamIndex === 0 ? "videoContent" : ("videoContent" + (streamIndex + 1))
 
+    // HD/SD stream switching state - read from settings
+    property bool   _useSecondaryUrl:   {
+        if (streamIndex === 0) return !QGroundControl.settingsManager.videoSettings.usingPrimaryUrl.rawValue
+        if (streamIndex === 1) return !QGroundControl.settingsManager.videoSettings.usingPrimaryUrl2.rawValue
+        if (streamIndex === 2) return !QGroundControl.settingsManager.videoSettings.usingPrimaryUrl3.rawValue
+        return false
+    }
+
     // Stream-specific settings based on streamIndex
     property bool   _streamEnabled: {
         if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.streamEnabled.rawValue
@@ -22,12 +30,24 @@ Item {
         if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.streamEnabled3.rawValue
         return false
     }
-    property string _streamUrl: {
+
+    property string _streamUrlPrimary: {
         if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.rtspUrl.rawValue
         if (streamIndex === 1) return QGroundControl.settingsManager.videoSettings.rtspUrl2.rawValue
         if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue
         return ""
     }
+
+    property string _streamUrlSecondary: {
+        if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.rtspUrlSecondary.rawValue
+        if (streamIndex === 1) return QGroundControl.settingsManager.videoSettings.rtspUrl2Secondary.rawValue
+        if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.rtspUrl3Secondary.rawValue
+        return ""
+    }
+
+    property string _streamUrl:         _useSecondaryUrl && _streamUrlSecondary.length > 0 ? _streamUrlSecondary : _streamUrlPrimary
+    property bool   _hasSecondaryUrl:   _streamUrlSecondary.length > 0
+
     property string _streamName: {
         if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.streamName.rawValue
         if (streamIndex === 1) return QGroundControl.settingsManager.videoSettings.streamName2.rawValue
@@ -52,8 +72,13 @@ Item {
         console.log("  - streamIndex:", streamIndex)
         console.log("  - videoContentName:", videoContentName)
         console.log("  - _streamEnabled:", _streamEnabled)
+        console.log("  - _streamUrlPrimary:", _streamUrlPrimary)
+        console.log("  - _streamUrlSecondary:", _streamUrlSecondary)
         console.log("  - _streamUrl:", _streamUrl)
+        console.log("  - _hasSecondaryUrl:", _hasSecondaryUrl)
+        console.log("  - _useSecondaryUrl:", _useSecondaryUrl)
         console.log("  - _streamConfigured:", _streamConfigured)
+        console.log("  - HD/SD Button visible:", _hasSecondaryUrl)
 
         // Initial check for decoding state
         root._isDecoding = QGroundControl.videoManager.isStreamDecoding(root.streamIndex)

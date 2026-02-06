@@ -144,6 +144,21 @@
         "default": "Main Camera"
     },
     {
+        "name": "rtspUrlSecondary",
+        "shortDesc": "Secondary RTSP URL (SD Quality)",
+        "longDesc": "Secondary RTSP URL for main stream, typically lower quality/SD version.",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "usingPrimaryUrl",
+        "shortDesc": "Using Primary URL",
+        "longDesc": "Internal flag: true = using primary/HD URL, false = using secondary/SD URL",
+        "type": "bool",
+        "default": true,
+        "qgcHiddenSetting": true
+    },
+    {
         "name": "rtspUrl2",
         "shortDesc": "RTSP URL for Stream 2",
         "type": "string",
@@ -163,6 +178,21 @@
         "default": "Camera 2"
     },
     {
+        "name": "rtspUrl2Secondary",
+        "shortDesc": "Secondary RTSP URL for Stream 2 (SD Quality)",
+        "longDesc": "Secondary RTSP URL for stream 2, typically lower quality/SD version.",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "usingPrimaryUrl2",
+        "shortDesc": "Using Primary URL for Stream 2",
+        "longDesc": "Internal flag: true = using primary/HD URL, false = using secondary/SD URL",
+        "type": "bool",
+        "default": true,
+        "qgcHiddenSetting": true
+    },
+    {
         "name": "rtspUrl3",
         "shortDesc": "RTSP URL for Stream 3",
         "type": "string",
@@ -180,6 +210,21 @@
         "longDesc": "Display name for video stream 3.",
         "type": "string",
         "default": "Camera 3"
+    },
+    {
+        "name": "rtspUrl3Secondary",
+        "shortDesc": "Secondary RTSP URL for Stream 3 (SD Quality)",
+        "longDesc": "Secondary RTSP URL for stream 3, typically lower quality/SD version.",
+        "type": "string",
+        "default": ""
+    },
+    {
+        "name": "usingPrimaryUrl3",
+        "shortDesc": "Using Primary URL for Stream 3",
+        "longDesc": "Internal flag: true = using primary/HD URL, false = using secondary/SD URL",
+        "type": "bool",
+        "default": true,
+        "qgcHiddenSetting": true
     }
 ]
 }

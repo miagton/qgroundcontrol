@@ -61,6 +61,14 @@ SettingsPage {
 
         LabelledFactTextField {
             Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("Secondary RTSP URL (SD)")
+            fact:                       _videoSettings.rtspUrlSecondary
+            visible:                    _isRTSP && fact.visible
+        }
+
+        LabelledFactTextField {
+            Layout.fillWidth:           true
             label:                      qsTr("TCP URL")
             textFieldPreferredWidth:    _urlFieldWidth
             fact:                       _videoSettings.tcpUrl
@@ -104,7 +112,13 @@ SettingsPage {
             visible:                    _videoSettings.streamEnabled2.value && fact.visible
         }
 
-
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("Secondary RTSP URL 2 (SD)")
+            fact:                       _videoSettings.rtspUrl2Secondary
+            visible:                    _videoSettings.streamEnabled2.value && fact.visible
+        }
 
         FactCheckBox {
             Layout.fillWidth:   true
@@ -129,7 +143,13 @@ SettingsPage {
             visible:                    _videoSettings.streamEnabled3.value && fact.visible
         }
 
-
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("Secondary RTSP URL 3 (SD)")
+            fact:                       _videoSettings.rtspUrl3Secondary
+            visible:                    _videoSettings.streamEnabled3.value && fact.visible
+        }
     }
 
     SettingsGroupLayout {
