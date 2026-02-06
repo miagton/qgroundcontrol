@@ -50,8 +50,8 @@ Item {
             return
         }
 
-        // Default to pip (false) so secondary windows start collapsed
-        var item1IsFull = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, false)
+        // Default to fullscreen (true) so main windows start fullscreen
+        var item1IsFull = QGroundControl.loadBoolGlobalSetting(item1IsFullSettingsKey, true)
         if (item1 && item2 && item1 !== item2) {
             // Both items present: initialize according to saved setting
             item1.pipState.state = item1IsFull ? item1.pipState.fullState : item1.pipState.pipState
@@ -60,8 +60,8 @@ Item {
             _pipOrWindowItem = item1IsFull ? item2 : item1
         } else {
             // Single-item view (item1 === item2): can toggle pip/full/window
-            // Start in pip mode by default
-            item1.pipState.state = item1.pipState.pipState
+            // Start in fullscreen mode by default
+            item1.pipState.state = item1.pipState.fullState
             _fullItem = item1
             _pipOrWindowItem = item1  // Set to item1 so windowed mode works
         }

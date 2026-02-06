@@ -94,7 +94,20 @@ Item {
         console.log("Stream 3 - URL:", QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue)
         console.log("Stream 3 - URL Length:", QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue.length)
         console.log("Stream 3 - _videoStream3Enabled:", _videoStream3Enabled)
+        console.log("Main Stream Enabled:", QGroundControl.settingsManager.videoSettings.streamEnabled.rawValue)
         console.log("========================================")
+
+        // Ensure something is always fullscreen on startup
+        // Check if main video stream is enabled in settings (not hasVideo which takes time to initialize)
+        // If main video is disabled, ensure map is fullscreen
+        var mainVideoEnabled = QGroundControl.settingsManager.videoSettings.streamEnabled.rawValue
+        if (!mainVideoEnabled) {
+            // Main video stream is disabled in settings, ensure map is fullscreen
+            if (mapControl.pipState) {
+                mapControl.pipState.state = mapControl.pipState.fullState
+            }
+        }
+        // If main video is enabled, PipView's default (fullscreen) will handle it
     }
 
     // Monitor stream enabled state changes using Connections
