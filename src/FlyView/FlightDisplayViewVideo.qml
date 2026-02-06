@@ -28,8 +28,13 @@ Item {
         if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.rtspUrl3.rawValue
         return ""
     }
+    property string _streamName: {
+        if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.streamName.rawValue
+        if (streamIndex === 1) return QGroundControl.settingsManager.videoSettings.streamName2.rawValue
+        if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.streamName3.rawValue
+        return qsTr("Stream %1").arg(streamIndex + 1)
+    }
     property bool   _streamConfigured:  _streamEnabled && _streamUrl.length > 0
-    property string _streamLabel:       streamIndex === 0 ? qsTr("VIDEO") : qsTr("STREAM %1").arg(streamIndex + 1)
 
     // Per-stream decoding status tracking - updated when any decoding state changes
     property bool   _isDecoding:        false
@@ -264,10 +269,34 @@ Item {
 
         QGCLabel {
             id:                 noVideoLabel
-            text:               _streamEnabled ? qsTr("WAITING FOR %1").arg(_streamLabel) : qsTr("%1 DISABLED").arg(_streamLabel)
+            text:               _streamEnabled ? qsTr("WAITING FOR %1").arg(_streamName) : qsTr("%1 DISABLED").arg(_streamName)
             font.bold:          true
             color:              "white"
             font.pointSize:     useSmallFont ? ScreenTools.smallFontPointSize : ScreenTools.largeFontPointSize
+            anchors.centerIn:   parent
+        }
+    }
+
+    // Stream name label when video is active - shown at top center
+    Rectangle {
+        id:                 streamNameBackground
+        anchors.top:        parent.top
+        anchors.topMargin:  ScreenTools.defaultFontPixelHeight * 0.5
+        anchors.horizontalCenter: parent.horizontalCenter
+        width:              streamNameLabel.contentWidth + ScreenTools.defaultFontPixelHeight
+        height:             streamNameLabel.contentHeight + (ScreenTools.defaultFontPixelHeight * 0.5)
+        radius:             ScreenTools.defaultFontPixelWidth / 2
+        color:              "black"
+        opacity:            0.6
+        visible:            _isDecoding
+        z:                  2  // On top of video
+
+        QGCLabel {
+            id:                 streamNameLabel
+            text:               _streamName
+            font.bold:          true
+            color:              "white"
+            font.pointSize:     useSmallFont ? ScreenTools.smallFontPointSize : ScreenTools.defaultFontPointSize
             anchors.centerIn:   parent
         }
     }

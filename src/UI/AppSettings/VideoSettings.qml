@@ -46,6 +46,14 @@ SettingsPage {
         LabelledFactTextField {
             Layout.fillWidth:           true
             textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("Main Stream Name")
+            fact:                       _videoSettings.streamName
+            visible:                    fact.visible
+        }
+
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
             label:                      qsTr("RTSP URL")
             fact:                       _videoSettings.rtspUrl
             visible:                    _isRTSP && _videoSettings.rtspUrl.visible
@@ -88,6 +96,14 @@ SettingsPage {
             visible:                    _videoSettings.streamEnabled2.value && fact.visible
         }
 
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("Stream 2 Name")
+            fact:                       _videoSettings.streamName2
+            visible:                    _videoSettings.streamEnabled2.value && fact.visible
+        }
+
         FactCheckBox {
             Layout.fillWidth:   true
             text:               qsTr("Enable Extra Stream 3")
@@ -100,6 +116,14 @@ SettingsPage {
             textFieldPreferredWidth:    _urlFieldWidth
             label:                      qsTr("RTSP URL 3")
             fact:                       _videoSettings.rtspUrl3
+            visible:                    _videoSettings.streamEnabled3.value && fact.visible
+        }
+
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            textFieldPreferredWidth:    _urlFieldWidth
+            label:                      qsTr("Stream 3 Name")
+            fact:                       _videoSettings.streamName3
             visible:                    _videoSettings.streamEnabled3.value && fact.visible
         }
     }

@@ -77,10 +77,13 @@ DECLARE_SETTINGSFACT(VideoSettings, enableStorageLimit)
 DECLARE_SETTINGSFACT(VideoSettings, streamEnabled)
 DECLARE_SETTINGSFACT(VideoSettings, disableWhenDisarmed)
 //new streams
+DECLARE_SETTINGSFACT(VideoSettings, streamName)
 DECLARE_SETTINGSFACT(VideoSettings, rtspUrl2)
 DECLARE_SETTINGSFACT(VideoSettings, streamEnabled2)
+DECLARE_SETTINGSFACT(VideoSettings, streamName2)
 DECLARE_SETTINGSFACT(VideoSettings, rtspUrl3)
 DECLARE_SETTINGSFACT(VideoSettings, streamEnabled3)
+DECLARE_SETTINGSFACT(VideoSettings, streamName3)
 
 DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, videoSource)
 {

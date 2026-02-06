@@ -137,6 +137,13 @@
     "qgcRebootRequired": true
 },
     {
+        "name": "streamName",
+        "shortDesc": "Video Stream Name",
+        "longDesc": "Display name for the main video stream.",
+        "type": "string",
+        "default": "Main Camera"
+    },
+    {
         "name": "rtspUrl2",
         "shortDesc": "RTSP URL for Stream 2",
         "type": "string",
@@ -149,6 +156,13 @@
         "default": false
     },
     {
+        "name": "streamName2",
+        "shortDesc": "Stream 2 Name",
+        "longDesc": "Display name for video stream 2.",
+        "type": "string",
+        "default": "Camera 2"
+    },
+    {
         "name": "rtspUrl3",
         "shortDesc": "RTSP URL for Stream 3",
         "type": "string",
@@ -159,6 +173,13 @@
         "shortDesc": "Enable Stream 3",
         "type": "bool",
         "default": false
+    },
+    {
+        "name": "streamName3",
+        "shortDesc": "Stream 3 Name",
+        "longDesc": "Display name for video stream 3.",
+        "type": "string",
+        "default": "Camera 3"
     }
 ]
 }

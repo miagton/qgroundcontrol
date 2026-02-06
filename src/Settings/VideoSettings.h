@@ -31,10 +31,13 @@ public:
     DEFINE_SETTINGFACT(forceVideoDecoder)
 
     // New data for multiple streams
+    DEFINE_SETTINGFACT(streamName)
     DEFINE_SETTINGFACT(rtspUrl2)
     DEFINE_SETTINGFACT(rtspUrl3)
     DEFINE_SETTINGFACT(streamEnabled2)
     DEFINE_SETTINGFACT(streamEnabled3)
+    DEFINE_SETTINGFACT(streamName2)
+    DEFINE_SETTINGFACT(streamName3)
 
     Q_PROPERTY(bool     streamConfigured        READ streamConfigured       NOTIFY streamConfiguredChanged)
     Q_PROPERTY(QString  rtspVideoSource         READ rtspVideoSource        CONSTANT)
