@@ -49,6 +49,7 @@ SettingsFact::SettingsFact(const QString &settingsGroup, FactMetaData *metaData,
 
         QMutexLocker<QRecursiveMutex> locker(&_rawValueMutex);
         _rawValue = resolvedValue;
+        _rawValueIsNotSet = false;  // Explicitly mark as set to prevent en-dash placeholder
     }
 
     (void) connect(this, &Fact::rawValueChanged, this, &SettingsFact::_rawValueChanged);
@@ -84,4 +85,13 @@ void SettingsFact::_rawValueChanged(const QVariant &value)
     }
 
     settings.setValue(_name, value);
+
+    // Force immediate write to disk to prevent data loss
+    // Without this, settings may be cached in memory and lost if app crashes
+    settings.sync();
+
+    // Check if sync was successful
+    if (settings.status() != QSettings::NoError) {
+        qCWarning(SettingsFactLog) << "Failed to save setting" << _name << "- QSettings status:" << settings.status();
+    }
 }
