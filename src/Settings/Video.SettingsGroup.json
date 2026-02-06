@@ -114,8 +114,8 @@
 },
 {
     "name":             "disableWhenDisarmed",
-    "shortDesc": "Video Stream Disnabled When Armed",
-    "longDesc":  "Disable Video Stream when disarmed.",
+    "shortDesc": "Stop Recording When Disarmed",
+    "longDesc":  "Automatically stop video recording when vehicle is disarmed.",
     "type":             "bool",
     "default":     false
 },
