@@ -293,11 +293,11 @@ Item {
         implicitWidth:      0  // Disable implicit sizing
         implicitHeight:     0  // Disable implicit sizing
         width:              _isFullScreen ? (ScreenTools.defaultFontPixelHeight * 2.5) : (ScreenTools.defaultFontPixelHeight * 1.8)
-        height:             _isFullScreen ? (ScreenTools.defaultFontPixelHeight * 0.9) : (ScreenTools.defaultFontPixelHeight * 0.8)
+        height:             _isFullScreen ? (ScreenTools.defaultFontPixelHeight * 2.5) : (ScreenTools.defaultFontPixelHeight * 0.8)
 
         // Position using x/y instead of anchors to avoid stretching issues
         x:                  parent.width - width - (_isFullScreen ? ScreenTools.defaultFontPixelHeight : (ScreenTools.defaultFontPixelHeight * 0.5))
-        y:                  _isFullScreen ? (parent.height - height) / 2 : (parent.height - height - (ScreenTools.defaultFontPixelHeight * 0.5))
+        y:                  _isFullScreen ? ((parent.height - height) / 2)-300 : (parent.height - height - (ScreenTools.defaultFontPixelHeight * 0.5))
 
         radius:             height / 2
         border.width:       1
