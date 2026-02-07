@@ -5,6 +5,7 @@
 #include "QGCApplication.h"
 #include "QGCCameraManager.h"
 #include "QGCCorePlugin.h"
+#include "QGCFileHelper.h"
 #include "QGCLoggingCategory.h"
 #include "SettingsManager.h"
 #include "SubtitleWriter.h"
@@ -203,18 +204,34 @@ void VideoManager::startRecording(const QString &videoFile)
         return;
     }
 
-    const QString videoFileUrl = videoFile.isEmpty() ? QDateTime::currentDateTime().toString("yyyy-MM-dd_hh.mm.ss") : videoFile;
+    // Generate timestamp for this recording session
+    const QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh.mm.ss");
+    const QString videoFileUrl = videoFile.isEmpty() ? timestamp : videoFile;
+
+    // Create timestamped subfolder for this recording session
+    const QString sessionFolder = QGCFileHelper::joinPath(savePath, timestamp);
+    if (!QGCFileHelper::ensureDirectoryExists(sessionFolder)) {
+        qgcApp()->showAppMessage(tr("Unable to create video recording folder: %1").arg(sessionFolder));
+        qCWarning(VideoManagerLog) << "Failed to create recording session folder:" << sessionFolder;
+        return;
+    }
+
     const QString ext = kFileExtension[fileFormat];
 
-    const QString videoFileNameTemplate = savePath + "/" + videoFileUrl + ".%1" + ext;
+    qCDebug(VideoManagerLog) << "Starting recording session in folder:" << sessionFolder;
 
     for (VideoReceiver *receiver : std::as_const(_videoReceivers)) {
         if (!receiver->started()) {
             qCDebug(VideoManagerLog) << "Video receiver is not ready.";
             continue;
         }
-        const QString streamName = (receiver->name() == QStringLiteral("videoContent")) ? "" : (receiver->name() + ".");
-        const QString videoFileName = videoFileNameTemplate.arg(streamName);
+
+        // Build filename: timestamp_streamName.ext (e.g., 2026-02-07_15.45.30_videoContent2.mp4)
+        // Main stream has no suffix, additional streams get _streamName suffix
+        const QString streamSuffix = (receiver->name() == QStringLiteral("videoContent")) ? "" : ("_" + receiver->name());
+        const QString videoFileName = QGCFileHelper::joinPath(sessionFolder, videoFileUrl + streamSuffix + "." + ext);
+
+        qCDebug(VideoManagerLog) << "Recording stream to:" << videoFileName;
         receiver->startRecording(videoFileName, fileFormat);
     }
 }
