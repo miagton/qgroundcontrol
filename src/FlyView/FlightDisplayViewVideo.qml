@@ -302,14 +302,14 @@ Item {
         }
     }
 
-    // Stream name label when video is active - shown at top center
+    // Stream name label when video is active - shown at middle-top of window
     Rectangle {
         id:                 streamNameBackground
-        anchors.top:        parent.top
-        anchors.topMargin:  ScreenTools.defaultFontPixelHeight * 0.5
         anchors.horizontalCenter: parent.horizontalCenter
-        width:              streamNameLabel.contentWidth + ScreenTools.defaultFontPixelHeight
-        height:             streamNameLabel.contentHeight + (ScreenTools.defaultFontPixelHeight * 0.5)
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: -(parent.height * 0.35)  // Move to upper-middle area (35% above center)
+        width:              streamNameLabel.contentWidth + (ScreenTools.defaultFontPixelHeight * 2)  // 2x padding
+        height:             streamNameLabel.contentHeight + (ScreenTools.defaultFontPixelHeight * 1)  // 2x padding
         radius:             ScreenTools.defaultFontPixelWidth / 2
         color:              "black"
         opacity:            0.6
@@ -321,7 +321,7 @@ Item {
             text:               _streamName
             font.bold:          true
             color:              "white"
-            font.pointSize:     useSmallFont ? ScreenTools.smallFontPointSize : ScreenTools.defaultFontPointSize
+            font.pointSize:     useSmallFont ? (ScreenTools.smallFontPointSize * 2) : (ScreenTools.defaultFontPointSize * 2)  // 2x font size
             anchors.centerIn:   parent
         }
     }
