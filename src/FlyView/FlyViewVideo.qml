@@ -282,69 +282,75 @@ Item {
     }
 
     // HD/SD quality toggle button - MUST BE LAST to be on top of everything
-    // Using Item wrapper to isolate from parent MouseArea
-    Item {
-        anchors.fill: parent
-        z: 10000  // Maximum z-order
+    Rectangle {
+        id:                 qualityButtonBackground2
+        z:                  10000  // Maximum z-order to be on top
 
-        Rectangle {
-            id:                 qualityButtonBackground2
-            anchors.bottom:     parent.bottom
-            anchors.bottomMargin: ScreenTools.defaultFontPixelHeight
-            anchors.right:      parent.right
-            anchors.rightMargin: ScreenTools.defaultFontPixelHeight
-            width:              qualityButtonLabel2.contentWidth + (ScreenTools.defaultFontPixelHeight * 1.5)
-            height:             qualityButtonLabel2.contentHeight + (ScreenTools.defaultFontPixelHeight)
-            radius:             height / 2
-            border.width:       2
-            border.color:       "white"
-            color:              _root._isTogglingQuality ? "#9E9E9E" : (qualityButtonMouseArea2.pressed ? "#FF9800" : (qualityButtonMouseArea2.containsMouse ? "#4CAF50" : "#2196F3"))
-            opacity:            _root._isTogglingQuality ? 0.5 : 0.9
-            visible:            videoStreaming._hasSecondaryUrl
+        // Fixed explicit size - NO anchors.fill on parent to prevent stretching
+        property bool _isFullScreen: pipState.state === pipState.fullState
 
-            QGCLabel {
-                id:                 qualityButtonLabel2
-                text:               _root._isTogglingQuality ? "..." : (videoStreaming._useSecondaryUrl ? "SD" : "HD")
-                font.bold:          true
-                color:              "white"
-                font.pointSize:     ScreenTools.largeFontPointSize
-                anchors.centerIn:   parent
+        // Explicit FIXED width and height - no implicit sizing, smaller in PIP mode
+        implicitWidth:      0  // Disable implicit sizing
+        implicitHeight:     0  // Disable implicit sizing
+        width:              _isFullScreen ? (ScreenTools.defaultFontPixelHeight * 2.5) : (ScreenTools.defaultFontPixelHeight * 1.8)
+        height:             _isFullScreen ? (ScreenTools.defaultFontPixelHeight * 0.9) : (ScreenTools.defaultFontPixelHeight * 0.8)
+
+        // Position using x/y instead of anchors to avoid stretching issues
+        x:                  parent.width - width - (_isFullScreen ? ScreenTools.defaultFontPixelHeight : (ScreenTools.defaultFontPixelHeight * 0.5))
+        y:                  _isFullScreen ? (parent.height - height) / 2 : (parent.height - height - (ScreenTools.defaultFontPixelHeight * 0.5))
+
+        radius:             height / 2
+        border.width:       1
+        border.color:       "white"
+
+        // Red for HD, Blue for SD
+        property color _baseColor: videoStreaming._useSecondaryUrl ? "#2196F3" : "#F44336"  // Blue for SD, Red for HD
+        color:              _root._isTogglingQuality ? "#9E9E9E" : (qualityButtonMouseArea2.pressed ? "#FF9800" : (qualityButtonMouseArea2.containsMouse ? Qt.lighter(_baseColor, 1.3) : _baseColor))
+        opacity:            _root._isTogglingQuality ? 0.5 : 0.85
+        visible:            videoStreaming._hasSecondaryUrl
+
+        QGCLabel {
+            id:                 qualityButtonLabel2
+            text:               _root._isTogglingQuality ? "..." : (videoStreaming._useSecondaryUrl ? "SD" : "HD")
+            font.bold:          true
+            color:              "white"
+            font.pointSize:     qualityButtonBackground2._isFullScreen ? ScreenTools.defaultFontPointSize : ScreenTools.smallFontPointSize
+            anchors.centerIn:   parent
+        }
+
+        MouseArea {
+            id:                 qualityButtonMouseArea2
+            anchors.fill:       parent
+            enabled:            !_root._isTogglingQuality
+            hoverEnabled:       true
+            cursorShape:        _root._isTogglingQuality ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+            propagateComposedEvents: false
+            preventStealing:    true
+
+            onPressed: (mouse) => {
+                mouse.accepted = true
+                console.log("!!! HD/SD button PRESSED !!!")
             }
 
-            MouseArea {
-                id:                 qualityButtonMouseArea2
-                anchors.fill:       parent
-                enabled:            !_root._isTogglingQuality
-                hoverEnabled:       true
-                cursorShape:        _root._isTogglingQuality ? Qt.ForbiddenCursor : Qt.PointingHandCursor
-                propagateComposedEvents: false
-                preventStealing:    true
+            onReleased: (mouse) => {
+                mouse.accepted = true
+                console.log("!!! HD/SD button RELEASED !!!")
+                // Trigger toggle on release to ensure it fires
+                _root.toggleStreamQuality()
+            }
 
-                onPressed: (mouse) => {
-                    mouse.accepted = true
-                    console.log("!!! HD/SD button PRESSED !!!")
-                }
+            onClicked: (mouse) => {
+                mouse.accepted = true
+                console.log("!!! HD/SD button CLICKED !!!")
+            }
 
-                onReleased: (mouse) => {
-                    mouse.accepted = true
-                    console.log("!!! HD/SD button RELEASED !!!")
-                    // Trigger toggle on release to ensure it fires
-                    _root.toggleStreamQuality()
-                }
+            onDoubleClicked: (mouse) => {
+                mouse.accepted = true
+                console.log("!!! HD/SD button DOUBLE-CLICKED (ignoring) !!!")
+            }
 
-                onClicked: (mouse) => {
-                    mouse.accepted = true
-                    console.log("!!! HD/SD button CLICKED !!!")
-                }
-
-                onDoubleClicked: (mouse) => {
-                    mouse.accepted = true
-                    console.log("!!! HD/SD button DOUBLE-CLICKED (ignoring) !!!")
-                }
-
-                onPressedChanged: {
-                    console.log("!!! HD/SD button pressedChanged:", pressed)
-                }
+            onPressedChanged: {
+                console.log("!!! HD/SD button pressedChanged:", pressed)
             }
         }
     }
