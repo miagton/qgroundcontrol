@@ -199,14 +199,13 @@ Rectangle {
                     implicitHeight:      photoVideoControlLoader.implicitHeight + ScreenTools.defaultFontPixelHeight * 2
                     implicitWidth:       photoVideoControlLoader.implicitWidth + ScreenTools.defaultFontPixelHeight * 2
 
-                    // We use a Loader to load the photoVideoControlComponent only when the active vehicle is not null
-                    // This make it easier to implement PhotoVideoControl without having to check for the mavlink camera
-                    // to be null all over the place
-
+                    // Show PhotoVideoControl when either:
+                    // 1. Vehicle is connected (for MAVLink camera control)
+                    // 2. Video streaming is available (for RTSP/UDP recording without vehicle)
                     Loader {
                         id:                         photoVideoControlLoader
                         anchors.horizontalCenter:   parent.horizontalCenter
-                        sourceComponent:            globals.activeVehicle ? photoVideoControlComponent : undefined
+                        sourceComponent:            globals.activeVehicle || QGroundControl.videoManager.hasVideo ? photoVideoControlComponent : undefined
 
                         property real rightEdgeCenterInset: visible ? parent.width - x : 0
 

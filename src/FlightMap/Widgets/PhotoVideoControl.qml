@@ -13,19 +13,29 @@ Rectangle {
     height:     mainLayout.height + (_smallMargins * 2)
     color:      Qt.rgba(qgcPal.window.r, qgcPal.window.g, qgcPal.window.b, 0.5)
     radius:     _margins
-    visible:    _camera.capturesVideo || _camera.capturesPhotos || _camera.hasTracking || _camera.hasVideoStream
+    visible:    _camera ? (_camera.capturesVideo || _camera.capturesPhotos || _camera.hasTracking || _camera.hasVideoStream) : _hasVideoWithoutCamera
 
     property real   _margins:                   ScreenTools.defaultFontPixelHeight / 2
     property real   _smallMargins:              ScreenTools.defaultFontPixelWidth / 2
     property var    _activeVehicle:             globals.activeVehicle
-    property var    _cameraManager:             _activeVehicle.cameraManager
-    property var    _camera:                    _cameraManager.currentCameraInstance
-    property bool   _cameraInPhotoMode:         _camera.cameraMode === MavlinkCameraControl.CAM_MODE_PHOTO
+    property var    _cameraManager:             _activeVehicle ? _activeVehicle.cameraManager : null
+    property var    _camera:                    _cameraManager ? _cameraManager.currentCameraInstance : null
+    property bool   _hasVideoWithoutCamera:     !_camera && QGroundControl.videoManager.hasVideo
+    property bool   _cameraInPhotoMode:         _camera ? (_camera.cameraMode === MavlinkCameraControl.CAM_MODE_PHOTO) : false
     property bool   _cameraInVideoMode:         !_cameraInPhotoMode
-    property bool   _videoCaptureIdle:          _camera.videoCaptureStatus === MavlinkCameraControl.VIDEO_CAPTURE_STATUS_STOPPED
-    property bool   _photoCaptureSingleIdle:    _camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_IDLE
-    property bool   _photoCaptureIntervalIdle:  _camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_INTERVAL_IDLE
+    property bool   _videoCaptureIdle:          _camera ? (_camera.videoCaptureStatus === MavlinkCameraControl.VIDEO_CAPTURE_STATUS_STOPPED) : !QGroundControl.videoManager.recording
+    property bool   _photoCaptureSingleIdle:    _camera ? (_camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_IDLE) : true
+    property bool   _photoCaptureIntervalIdle:  _camera ? (_camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_INTERVAL_IDLE) : true
     property bool   _photoCaptureIdle:          _photoCaptureSingleIdle || _photoCaptureIntervalIdle
+
+    // Video recording without camera support
+    function recordWithoutCamera() {
+        if (QGroundControl.videoManager.recording) {
+            QGroundControl.videoManager.stopRecording()
+        } else {
+            QGroundControl.videoManager.startRecording("")
+        }
+    }
 
 /*
     // Used for testing camera ui options. Set _camera to testCamera to use.
@@ -101,7 +111,7 @@ Rectangle {
         ColumnLayout {
             Layout.fillHeight:  true
             spacing:            0
-            visible:            _camera.hasZoom
+            visible:            _camera && _camera.hasZoom
 
             QGCLabel {
                 Layout.alignment:   Qt.AlignHCenter
@@ -115,9 +125,9 @@ Rectangle {
                 orientation:        Qt.Vertical
                 to:                 100
                 from:               0
-                value:              _camera.zoomLevel
+                value:              _camera ? _camera.zoomLevel : 0
                 live:               true
-                onValueChanged:     _camera.zoomLevel = value
+                onValueChanged:     if (_camera) _camera.zoomLevel = value
             }
         }
 
@@ -127,8 +137,8 @@ Rectangle {
             // Camera name
             QGCLabel {
                 Layout.alignment:   Qt.AlignHCenter
-                text:               _camera.modelName
-                visible:            _cameraManager.cameras.length > 1
+                text:               _camera ? _camera.modelName : ""
+                visible:            _camera && _cameraManager && _cameraManager.cameras.length > 1
             }
 
             // Photo/Video Mode Selector
@@ -138,7 +148,7 @@ Rectangle {
                 height:             width / 2
                 color:              qgcPal.windowShadeLight
                 radius:             height * 0.5
-                visible:            _camera.hasModes
+                visible:            _camera && _camera.hasModes
 
                 //-- Video Mode
                 Rectangle {
@@ -163,7 +173,7 @@ Rectangle {
                         MouseArea {
                             anchors.fill:   parent
                             enabled:        _cameraInPhotoMode ? _photoCaptureIdle : true
-                            onClicked:      _camera.setCameraModeVideo()
+                            onClicked:      if (_camera) _camera.setCameraModeVideo()
                         }
                     }
                 }
@@ -191,7 +201,7 @@ Rectangle {
                         MouseArea {
                             anchors.fill:   parent
                             enabled:        _cameraInVideoMode ? _videoCaptureIdle : true
-                            onClicked:      _camera.setCameraModePhoto()
+                            onClicked:      if (_camera) _camera.setCameraModePhoto()
                         }
                     }
                 }
@@ -200,7 +210,7 @@ Rectangle {
             ColumnLayout {
                 Layout.alignment:   Qt.AlignHCenter
                 spacing:            _smallMargins
-                visible:            _camera.capturesVideo || _camera.capturesPhotos
+                visible:            _camera ? (_camera.capturesVideo || _camera.capturesPhotos) : _hasVideoWithoutCamera
 
                 // Take Photo, Start/Stop Video button
                 Rectangle {
@@ -212,7 +222,7 @@ Rectangle {
                     radius:             width * 0.5
                     border.width:       1
                     border.color:       captureButtonPalette.buttonBorder
-                    enabled:            _cameraInPhotoMode || (_cameraInVideoMode && _camera.hasVideoStream)
+                    enabled:            _camera ? (_cameraInPhotoMode || (_cameraInVideoMode && _camera.hasVideoStream)) : _hasVideoWithoutCamera
 
                     property color  captureButtonColor:  _cameraInPhotoMode ? captureButtonPalette.photoCaptureButtonColor : captureButtonPalette.videoCaptureButtonColor
 
@@ -237,13 +247,13 @@ Rectangle {
                         border.width:               1
                         border.color:               captureButtonPalette.buttonBorder
 
-                        property bool _isShootingInPhotoMode:   _cameraInPhotoMode && _camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_IN_PROGRESS
-                        property bool _isShootingInVideoMode:   (!_cameraInPhotoMode && _camera.videoCaptureStatus === MavlinkCameraControl.VIDEO_CAPTURE_STATUS_RUNNING)
+                        property bool _isShootingInPhotoMode:   _camera && _cameraInPhotoMode && _camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_IN_PROGRESS
+                        property bool _isShootingInVideoMode:   _camera ? (!_cameraInPhotoMode && _camera.videoCaptureStatus === MavlinkCameraControl.VIDEO_CAPTURE_STATUS_RUNNING) : QGroundControl.videoManager.recording
                         property bool _isShootingInCurrentMode: _cameraInPhotoMode ? _isShootingInPhotoMode : _isShootingInVideoMode
                         property bool _isShootingInOtherMode:   _cameraInPhotoMode ? _isShootingInVideoMode : _isShootingInPhotoMode
-                        property bool _canShootInCurrentMode:   _isShootingInOtherMode ?
+                        property bool _canShootInCurrentMode:   _camera ? (_isShootingInOtherMode ?
                                                                     (_cameraInPhotoMode ? _camera.photosInVideoMode : _camera.videoInPhotoMode) :
-                                                                    true
+                                                                    true) : true
                     }
 
                     MouseArea {
@@ -251,6 +261,13 @@ Rectangle {
                         onClicked:      toggleShooting()
 
                         function toggleShooting() {
+                            // If no camera, use direct VideoManager recording
+                            if (!_camera) {
+                                recordWithoutCamera()
+                                return
+                            }
+
+                            // Camera exists - use normal camera control
                             if (_cameraInPhotoMode) {
                                 if (_camera.photoCaptureStatus === MavlinkCameraControl.PHOTO_CAPTURE_INTERVAL_IN_PROGRESS) {
                                     _camera.stopTakePhoto()
@@ -278,7 +295,7 @@ Rectangle {
                         anchors.leftMargin: _smallMargins
                         anchors.left:       parent.left
                         anchors.top:        parent.top
-                        text:               _videoCaptureIdle ? "00:00:00" : _camera.recordTimeStr
+                        text:               _videoCaptureIdle ? "00:00:00" : (_camera ? _camera.recordTimeStr : "REC")
                         visible:            _cameraInVideoMode
                     }
 
@@ -298,22 +315,22 @@ Rectangle {
             ColumnLayout {
                 Layout.alignment:   Qt.AlignHCenter
                 spacing:            0
-                visible:            storageStatus.visible || batteryStatus.visible
+                visible:            _camera && (storageStatus.visible || batteryStatus.visible)
 
                 QGCLabel {
                     id:                 storageStatus
                     Layout.alignment:   Qt.AlignHCenter
-                    text:               qsTr("Free: ") + _camera.storageFreeStr
+                    text:               _camera ? (qsTr("Free: ") + _camera.storageFreeStr) : ""
                     font.pointSize:     ScreenTools.defaultFontPointSize
-                    visible:            _camera.storageStatus === MavlinkCameraControl.STORAGE_READY
+                    visible:            _camera && _camera.storageStatus === MavlinkCameraControl.STORAGE_READY
                 }
 
                 QGCLabel {
                     id:                 batteryStatus
                     Layout.alignment:   Qt.AlignHCenter
-                    text:               qsTr("Battery: ") + _camera.batteryRemainingStr
+                    text:               _camera ? (qsTr("Battery: ") + _camera.batteryRemainingStr) : ""
                     font.pointSize:     ScreenTools.defaultFontPointSize
-                    visible:            _camera.batteryRemaining >= 0
+                    visible:            _camera && _camera.batteryRemaining >= 0
                 }
             }
 
@@ -321,11 +338,11 @@ Rectangle {
                 id:                 trackingControls
                 Layout.alignment:   Qt.AlignHCenter
                 spacing:            0
-                visible:            _camera.hasTracking
+                visible:            _camera && _camera.hasTracking
 
                 Rectangle {
                     Layout.alignment:       Qt.AlignHCenter
-                    color:                  _camera.trackingEnabled ? qgcPal.colorRed : qgcPal.windowShadeLight
+                    color:                  _camera && _camera.trackingEnabled ? qgcPal.colorRed : qgcPal.windowShadeLight
                     Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 6
                     Layout.preferredHeight: Layout.preferredWidth
                     border.color:           qgcPal.buttonText
@@ -343,6 +360,7 @@ Rectangle {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
+                                if (!_camera) return
                                 _camera.trackingEnabled = !_camera.trackingEnabled;
                                 if (!_camera.trackingEnabled) {
                                     _camera.stopTracking()
@@ -368,6 +386,7 @@ Rectangle {
                 sourceSize.height:      Layout.preferredHeight
                 color:                  qgcPal.text
                 fillMode:               Image.PreserveAspectFit
+                visible:                _camera
 
                 QGCMouseArea {
                     fillItem:   parent
