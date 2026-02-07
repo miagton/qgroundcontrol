@@ -18,6 +18,8 @@ public:
     DEFINE_SETTINGFACT(tcpUrl)
     DEFINE_SETTINGFACT(rtspUrl)
     DEFINE_SETTINGFACT(aspectRatio)
+    DEFINE_SETTINGFACT(aspectRatio2)
+    DEFINE_SETTINGFACT(aspectRatio3)
     DEFINE_SETTINGFACT(videoFit)
     DEFINE_SETTINGFACT(gridLines)
     DEFINE_SETTINGFACT(showRecControl)

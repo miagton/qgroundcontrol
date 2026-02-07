@@ -57,6 +57,7 @@ public:
     Q_INVOKABLE void stopRecording();
     Q_INVOKABLE void stopVideo();
     Q_INVOKABLE bool isStreamDecoding(int streamIndex) const;
+    Q_INVOKABLE QSize getStreamVideoSize(int streamIndex) const;
     Q_INVOKABLE void registerVideoWidget(const QString &name, QQuickItem *widget);
 
     void init(QQuickWindow *mainWindow);
@@ -128,6 +129,7 @@ private:
     QAtomicInteger<bool> _recording = false;
     QAtomicInteger<bool> _streaming = false;
     QSize _videoSize;
+    QMap<QString, QSize> _receiverVideoSizes;  // Per-receiver video sizes (key = receiver name)
     QString _imageFile;
     QString _uvcVideoSourceID;
     Vehicle *_activeVehicle = nullptr;

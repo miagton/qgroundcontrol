@@ -69,6 +69,13 @@ SettingsPage {
 
         LabelledFactTextField {
             Layout.fillWidth:           true
+            label:                      qsTr("Main Stream Aspect Ratio (0=auto)")
+            fact:                       _videoSettings.aspectRatio
+            visible:                    _isRTSP && fact.visible
+        }
+
+        LabelledFactTextField {
+            Layout.fillWidth:           true
             label:                      qsTr("TCP URL")
             textFieldPreferredWidth:    _urlFieldWidth
             fact:                       _videoSettings.tcpUrl
@@ -120,6 +127,13 @@ SettingsPage {
             visible:                    _videoSettings.streamEnabled2.value && fact.visible
         }
 
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            label:                      qsTr("Stream 2 Aspect Ratio (0=auto)")
+            fact:                       _videoSettings.aspectRatio2
+            visible:                    _videoSettings.streamEnabled2.value && fact.visible
+        }
+
         FactCheckBox {
             Layout.fillWidth:   true
             text:               qsTr("Enable Extra Stream 3")
@@ -150,6 +164,13 @@ SettingsPage {
             fact:                       _videoSettings.rtspUrl3Secondary
             visible:                    _videoSettings.streamEnabled3.value && fact.visible
         }
+
+        LabelledFactTextField {
+            Layout.fillWidth:           true
+            label:                      qsTr("Stream 3 Aspect Ratio (0=auto)")
+            fact:                       _videoSettings.aspectRatio3
+            visible:                    _videoSettings.streamEnabled3.value && fact.visible
+        }
     }
 
     SettingsGroupLayout {
@@ -157,12 +178,6 @@ SettingsPage {
         heading:            qsTr("Settings")
         visible:            !_videoSourceDisabled
 
-        LabelledFactTextField {
-            Layout.fillWidth:   true
-            label:              qsTr("Aspect Ratio")
-            fact:               _videoSettings.aspectRatio
-            visible:            !_videoAutoStreamConfig && _isStreamSource && _videoSettings.aspectRatio.visible
-        }
 
         FactCheckBoxSlider {
             Layout.fillWidth:   true

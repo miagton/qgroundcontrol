@@ -39,14 +39,6 @@
     "default":     ""
 },
 {
-    "name":             "aspectRatio",
-    "shortDesc": "Video Aspect Ratio",
-    "longDesc":  "Video Aspect Ratio (width / height). Use 0.0 to ignore it.",
-    "type":             "float",
-    "decimalPlaces":    6,
-    "default":     1.777777
-},
-{
     "name":         "gridLines",
     "shortDesc":    "Video Grid Lines",
     "longDesc":     "Displays a grid overlaid over the video view.",
@@ -159,6 +151,14 @@
         "qgcHiddenSetting": true
     },
     {
+        "name": "aspectRatio",
+        "shortDesc": "Main Stream Aspect Ratio",
+        "longDesc": "Aspect ratio (width / height) for main video stream. Use 0.0 to auto-detect from stream.",
+        "type": "float",
+        "decimalPlaces": 6,
+        "default": 0.0
+    },
+    {
         "name": "rtspUrl2",
         "shortDesc": "RTSP URL for Stream 2",
         "type": "string",
@@ -193,6 +193,14 @@
         "qgcHiddenSetting": true
     },
     {
+        "name": "aspectRatio2",
+        "shortDesc": "Stream 2 Aspect Ratio",
+        "longDesc": "Aspect ratio (width / height) for video stream 2. Use 0.0 to auto-detect from stream.",
+        "type": "float",
+        "decimalPlaces": 6,
+        "default": 0.0
+    },
+    {
         "name": "rtspUrl3",
         "shortDesc": "RTSP URL for Stream 3",
         "type": "string",
@@ -225,6 +233,14 @@
         "type": "bool",
         "default": true,
         "qgcHiddenSetting": true
+    },
+    {
+        "name": "aspectRatio3",
+        "shortDesc": "Stream 3 Aspect Ratio",
+        "longDesc": "Aspect ratio (width / height) for video stream 3. Use 0.0 to auto-detect from stream.",
+        "type": "float",
+        "decimalPlaces": 6,
+        "default": 0.0
     }
 ]
 }

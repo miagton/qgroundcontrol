@@ -106,9 +106,24 @@ Item {
     // ========== Common Properties ==========
     property bool useSmallFont: true
 
-    property double _ar:                QGroundControl.videoManager.gstreamerEnabled
-                                            ? QGroundControl.videoManager.videoSize.width / QGroundControl.videoManager.videoSize.height
-                                            : QGroundControl.videoManager.aspectRatio
+    // Get per-stream aspect ratio setting
+    property double _configuredAspectRatio: {
+        if (streamIndex === 0) return QGroundControl.settingsManager.videoSettings.aspectRatio.rawValue
+        if (streamIndex === 1) return QGroundControl.settingsManager.videoSettings.aspectRatio2.rawValue
+        if (streamIndex === 2) return QGroundControl.settingsManager.videoSettings.aspectRatio3.rawValue
+        return 0.0
+    }
+
+    // Get video size for THIS specific stream, not the global size
+    property var    _streamVideoSize:   QGroundControl.videoManager.getStreamVideoSize(streamIndex)
+
+    // Use configured aspect ratio if set (non-zero), otherwise auto-detect from stream size
+    property double _ar:                _configuredAspectRatio > 0.0
+                                            ? _configuredAspectRatio
+                                            : (QGroundControl.videoManager.gstreamerEnabled && _streamVideoSize.width > 0 && _streamVideoSize.height > 0
+                                                ? _streamVideoSize.width / _streamVideoSize.height
+                                                : 1.777777)  // Default 16:9 if nothing else available
+
     property bool   _showGrid:          QGroundControl.settingsManager.videoSettings.gridLines.rawValue
     property var    _dynamicCameras:    globals.activeVehicle ? globals.activeVehicle.cameraManager : null
     property bool   _connected:         globals.activeVehicle ? !globals.activeVehicle.communicationLost : false

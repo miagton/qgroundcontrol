@@ -86,7 +86,13 @@ void VideoManager::init(QQuickWindow *mainWindow)
     (void) connect(_videoSettings->udpUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->rtspUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->tcpUrl(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
+
+    // Per-stream aspect ratio changes trigger aspect ratio changed signal
     (void) connect(_videoSettings->aspectRatio(), &Fact::rawValueChanged, this, &VideoManager::aspectRatioChanged);
+    // TODO: Uncomment after settings regeneration:
+     (void) connect(_videoSettings->aspectRatio2(), &Fact::rawValueChanged, this, &VideoManager::aspectRatioChanged);
+     (void) connect(_videoSettings->aspectRatio3(), &Fact::rawValueChanged, this, &VideoManager::aspectRatioChanged);
+
     (void) connect(_videoSettings->lowLatencyMode(), &Fact::rawValueChanged, this, [this](const QVariant &value) { Q_UNUSED(value); _restartAllVideos(); });
 
     // Additional video streams
@@ -262,6 +268,7 @@ void VideoManager::grabImage(const QString &imageFile)
 
 double VideoManager::aspectRatio() const
 {
+    // First try to get from main stream's video stream info
     for (VideoReceiver *receiver : _videoReceivers) {
         QGCVideoStreamInfo *pInfo = receiver->videoStreamInfo();
         if (!receiver->isThermal() && pInfo && !pInfo->isThermal()) {
@@ -269,8 +276,9 @@ double VideoManager::aspectRatio() const
         }
     }
 
-    // FIXME: use _videoReceiver->videoSize() to calculate AR (if AR is not specified in the settings?)
-    return _videoSettings->aspectRatio()->rawValue().toDouble();
+    // Return main stream's configured aspect ratio, or default 16:9 if not set
+    double configuredAr = _videoSettings->aspectRatio()->rawValue().toDouble();
+    return configuredAr > 0.0 ? configuredAr : 1.777777;
 }
 
 double VideoManager::thermalAspectRatio() const
@@ -356,6 +364,36 @@ bool VideoManager::isStreamDecoding(int streamIndex) const
 
     qCWarning(VideoManagerLog) << "Receiver not found for stream index:" << streamIndex;
     return false;
+}
+
+QSize VideoManager::getStreamVideoSize(int streamIndex) const
+{
+    // Map streamIndex to receiver name
+    QString receiverName;
+    switch (streamIndex) {
+        case 0:
+            receiverName = QStringLiteral("videoContent");
+            break;
+        case 1:
+            receiverName = QStringLiteral("videoContent2");
+            break;
+        case 2:
+            receiverName = QStringLiteral("videoContent3");
+            break;
+        default:
+            qCWarning(VideoManagerLog) << "Invalid stream index:" << streamIndex;
+            return QSize();
+    }
+
+    // Return the stored video size for this receiver
+    if (_receiverVideoSizes.contains(receiverName)) {
+        const QSize size = _receiverVideoSizes[receiverName];
+        qCDebug(VideoManagerLog) << "Stream" << streamIndex << "(" << receiverName << ") video size:" << size.width() << "x" << size.height();
+        return size;
+    }
+
+    qCDebug(VideoManagerLog) << "No video size available for stream index:" << streamIndex;
+    return QSize();
 }
 
 bool VideoManager::isUvc() const
@@ -1006,6 +1044,11 @@ void VideoManager::_initVideoReceiver(VideoReceiver *receiver, QQuickWindow *win
 
     (void) connect(receiver, &VideoReceiver::videoSizeChanged, this, [this, receiver](QSize size) {
         qCDebug(VideoManagerLog) << "Video" << receiver->name() << "resized. New resolution:" << size.width() << "x" << size.height();
+
+        // Store per-receiver video size
+        _receiverVideoSizes[receiver->name()] = size;
+
+        // Update global size for main stream (backward compatibility)
         if (!receiver->isThermal()) {
             _videoSize = size;
             emit videoSizeChanged();
@@ -1195,6 +1238,11 @@ void VideoManager::registerVideoWidget(const QString &name, QQuickItem *widget)
 
         (void) connect(receiver, &VideoReceiver::videoSizeChanged, this, [this, receiver](QSize size) {
             qCDebug(VideoManagerLog) << "Video" << receiver->name() << "resized. New resolution:" << size.width() << "x" << size.height();
+
+            // Store per-receiver video size
+            _receiverVideoSizes[receiver->name()] = size;
+
+            // Update global size for main stream (backward compatibility)
             if (!receiver->isThermal()) {
                 _videoSize = size;
                 emit videoSizeChanged();
